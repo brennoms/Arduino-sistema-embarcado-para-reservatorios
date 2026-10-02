@@ -1,3 +1,5 @@
+//Autor: Brenno Marques Silva @brennoms
+
 #include <Arduino.h>
 #include <stdint.h>
 #include <stdbool.h>

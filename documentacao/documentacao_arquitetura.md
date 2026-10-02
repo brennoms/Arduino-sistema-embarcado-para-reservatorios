@@ -1,9 +1,4 @@
----
-id: documentacao_projeto
-title: Documentação da Arquitetura — Sistema Programável de Três Bombas
----
-
-# Documentação da Arquitetura — Sistema Programável de Três Bombas
+ # Documentação da Arquitetura — Sistema Programável de Três Bombas
 
 ## 1. Visão geral
 
@@ -1020,3 +1015,9 @@ Os **7 bits de endereço** permitem exatamente **128 posições de memória**, d
 A implementação utiliza `uint32_t` para armazenar cada palavra por praticidade, mas os 14 bits restantes não fazem parte da memória arquitetural. A separação entre conteúdo (`MEM_PROG`) e ocupação (`MEM_OCUPADA`) também permite detectar corretamente posições não carregadas.
 
 O resultado é uma máquina virtual simples, de palavra fixa, com espaço de endereçamento definido, ISA própria e ciclo de instrução explícito, adequada à proposta do trabalho de aplicar os conceitos fundamentais de Arquitetura de Computadores.
+
+---
+
+Autor: Brenno Marques (@brennoms)
+
+
