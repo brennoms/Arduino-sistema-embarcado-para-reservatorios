@@ -7,40 +7,45 @@
 #include <stdlib.h>
 
 // ============================================================================
-// ARQUITETURA SIMULADA — SISTEMA PROGRAMÁVEL DE TRÊS BOMBAS
+// ARQUITETURA SIMULADA — SISTEMA PROGRAMÁVEL DE TRÊS BOMBAS (COM SECDED)
 //
-// Palavra da ISA: 18 bits
+// Palavra lógica da ISA: 18 bits
 //   bits 17..14 -> opcode (4 bits)
 //   bits 13..7  -> operando 1 (7 bits)
 //   bits 6..0   -> operando 2 (7 bits)
 //
+// Proteção de Memória SECDED (Hamming Estendido 24,18):
+//   - 18 bits de dados da ISA (D0..D17)
+//   - 5 bits de paridade de Hamming (P1, P2, P4, P8, P16) nas posições 1,2,4,8,16
+//   - 1 bit de paridade global (P0) na posição 0
+//   - Palavra física armazenada em MEM_PROG: 24 bits (bits 23..0 do uint32_t)
+//
 // Memória de programa:
 //   128 posições: 0x00 .. 0x7F
-//   uma palavra de 18 bits por posição
-//
-// A execução depende somente da palavra armazenada em MEM_PROG.
-// O texto Assembly é usado somente durante a carga/montagem.
+//   uma palavra física de 24 bits (18 bits ISA + 6 bits ECC) por posição
 // ============================================================================
 
 // ============================== Constantes =================================
-#define BITS_OPCODE       4
-#define BITS_OPERANDO     7
-#define BITS_PALAVRA      18
-#define TAM_MEMORIA       128
+#define BITS_OPCODE        4
+#define BITS_OPERANDO      7
+#define BITS_PALAVRA       18
+#define BITS_ECC           6
+#define BITS_FISICOS       24
+#define TAM_MEMORIA        128
 #define VALOR_MAX_OPERANDO 0x7F
-#define MAX_PERCENTUAL    100
+#define MAX_PERCENTUAL     100
 
-// Grupo define o limite de t. Aqui foi adotado 600 unidades de 100 ms = 60 s.
-// Altere somente esta constante caso o grupo documente outro limite.
-#define MAX_WAIT_TICKS    600
+// Ajustado para 127 para manter coerência estrita com o campo OP1 de 7 bits (12,7 s).
+#define MAX_WAIT_TICKS     127
 #define WAIT_MS            100UL
 
-#define OPCODE_SHIFT      14
+#define OPCODE_SHIFT       14
 #define OPERANDO1_SHIFT    7
-#define MASCARA_7_BITS    0x7FUL
-#define MASCARA_PALAVRA   0x3FFFFUL
+#define MASCARA_7_BITS     0x7FUL
+#define MASCARA_PALAVRA    0x3FFFFUL
+#define MASCARA_FISICA     0xFFFFFFUL
 
-#define LINE_BUFFER_SIZE  96
+#define LINE_BUFFER_SIZE   96
 
 // ================================ Pinagem ===================================
 const uint8_t PIN_NIVEL[3] = {A0, A1, A2};
@@ -49,8 +54,6 @@ const uint8_t PIN_LED_PREVENTIVO[3] = {33, 34, 35};
 const uint8_t PIN_BUZZER = 45;
 const uint8_t PIN_DISPLAY[7] = {22, 23, 24, 25, 26, 27, 28}; // a,b,c,d,e,f,g
 
-// true  -> display comum catodo / segmentos ativos em HIGH
-// false -> display comum anodo / segmentos ativos em LOW
 #define DISPLAY_ACTIVE_HIGH true
 
 // ============================= Códigos da ISA ===============================
@@ -85,6 +88,26 @@ enum SinalMemoria : uint8_t {
     MEM_ESCRITA
 };
 
+// ============================ Estados do SECDED =============================
+enum StatusSECDED : uint8_t {
+    ECC_OK = 0,
+    ECC_SEC_CORRIGIDO,
+    ECC_DED_ERRO_DUPLO
+};
+
+const char *NOME_ECC[] = {
+    "OK (Sem Erro)",
+    "SEC (1 Erro Corrigido)",
+    "DED (2 Erros Detectados - Falha Critica)"
+};
+
+// Mapeamento dos 18 bits de dados (D0..D17) para as posições de Hamming (1..23),
+// pulando as potências de 2 (1, 2, 4, 8, 16).
+const uint8_t POS_DADOS_HAMMING[BITS_PALAVRA] = {
+    3,  5,  6,  7,  9,  10, 11, 12, 13,
+    14, 15, 17, 18, 19, 20, 21, 22, 23
+};
+
 // ============================== Estados da UC ===============================
 enum ModoExecucao : uint8_t {
     MODO_CARGA = 0,
@@ -108,11 +131,18 @@ enum FaseUC : uint8_t {
 };
 
 // ============================= Registradores =================================
-// Registradores de comunicação da arquitetura.
-uint8_t  PC = 0;                       // 7 bits efetivos; mantido como 8 para detectar limites
+uint8_t  PC = 0;                       // 7 bits efetivos
 uint8_t  MAR = 0;                      // endereço de memória
-uint32_t MBR = 0;                      // palavra completa (18 bits efetivos)
-uint32_t IR = 0;                       // palavra completa (18 bits efetivos)
+uint32_t MBR = 0;                      // palavra lógica de 18 bits entregue pela memória
+uint32_t MBR_RAW = 0;                  // palavra física de 24 bits lida antes/depois do ECC
+uint32_t IR = 0;                       // palavra completa da instrução (18 bits efetivos)
+
+// Registradores de diagnóstico do controlador SECDED
+uint8_t      ECC_SINDROME = 0;         // 5 bits (0..23)
+uint8_t      ECC_PARIDADE_GLOBAL = 0;  // 1 bit (0 ou 1)
+StatusSECDED ECC_STATUS = ECC_OK;
+uint16_t     CONTADOR_SEC = 0;         // total de erros simples corrigidos desde o LOAD
+uint16_t     CONTADOR_DED = 0;         // total de erros duplos detectados desde o LOAD
 
 int16_t  ACC = 0;                      // resultado assinado; faixa útil -100..100
 uint8_t  OPCODE_REG = OP_INVALID;
@@ -127,17 +157,15 @@ bool FLAG_Z = false;
 bool FLAG_G = false;
 bool COMPARACAO_VALIDA = false;
 
-// Saídas simuladas/controladas pelo Arduino.
 bool BOMBA_LIGADA[3] = {false, false, false};
 bool LED_PREVENTIVO[3] = {false, false, false};
 bool ALARME_CORRETIVO[3] = {false, false, false};
 
 // ================================ Memória ===================================
-// Apenas 18 bits são usados.
+// Cada posição armazena 24 bits físicos: [23..1: Hamming(23,18)] + [0: Paridade Global P0]
 uint32_t MEM_PROG[TAM_MEMORIA] = {0};
 bool MEM_OCUPADA[TAM_MEMORIA] = {false};
 
-// Ponteiro de carga: 0..128. 128 significa memória cheia.
 uint16_t instrucao_atual = 0;
 bool programaFinalizado = false;
 
@@ -146,17 +174,11 @@ ModoExecucao MODO = MODO_CARGA;
 FaseUC FASE = FASE_OCIOSA;
 bool CLOCK = false;
 
-// WAIT não bloqueante.
 uint32_t waitTermino = 0;
 ModoExecucao modoAposWait = MODO_PARADO;
-
-// Solicitação de STEP fica separada do processamento serial.
 bool stepSolicitado = false;
-
-// Último estado do display.
 uint8_t ultimoDigito = 0;
 
-// Buffer não bloqueante do monitor serial.
 char linhaSerial[LINE_BUFFER_SIZE];
 uint8_t posLinhaSerial = 0;
 
@@ -186,6 +208,13 @@ void imprimirBinario18(uint32_t palavra) {
     palavra &= MASCARA_PALAVRA;
     for (int8_t bit = BITS_PALAVRA - 1; bit >= 0; --bit) {
         Serial.print((palavra >> bit) & 1UL);
+    }
+}
+
+void imprimirBinario24(uint32_t palavraFisica) {
+    palavraFisica &= MASCARA_FISICA;
+    for (int8_t bit = BITS_FISICOS - 1; bit >= 0; --bit) {
+        Serial.print((palavraFisica >> bit) & 1UL);
     }
 }
 
@@ -271,7 +300,6 @@ int hexDigit(char c) {
     return -1;
 }
 
-// Endereços devem obrigatoriamente usar 0x + dois dígitos.
 bool parseEnderecoHex(const char *texto, uint8_t *saida) {
     if (texto == NULL || saida == NULL) return false;
     if (strlen(texto) != 4) return false;
@@ -290,6 +318,121 @@ bool parseEnderecoHex(const char *texto, uint8_t *saida) {
 
 const char *nomeModoAtual() {
     return NOME_MODO[MODO];
+}
+
+// ============================ Módulo SECDED =================================
+// Codifica 18 bits da ISA em uma palavra física de 24 bits (Hamming Estendido 24,18)
+uint32_t codificarSECDED(uint32_t dados18) {
+    dados18 &= MASCARA_PALAVRA;
+    uint32_t codificado = 0;
+
+    // 1) Posiciona os 18 bits de dados nos índices que não são potências de 2
+    for (uint8_t i = 0; i < BITS_PALAVRA; ++i) {
+        if ((dados18 >> i) & 1UL) {
+            codificado |= (1UL << POS_DADOS_HAMMING[i]);
+        }
+    }
+
+    // 2) Calcula os 5 bits de paridade de Hamming (P1, P2, P4, P8, P16)
+    for (uint8_t k = 0; k < 5; ++k) {
+        uint8_t posParidade = (1U << k); // 1, 2, 4, 8, 16
+        uint8_t paridade = 0;
+
+        for (uint8_t pos = 1; pos <= 23; ++pos) {
+            if (pos != posParidade && (pos & posParidade)) {
+                paridade ^= (uint8_t)((codificado >> pos) & 1UL);
+            }
+        }
+
+        if (paridade) {
+            codificado |= (1UL << posParidade);
+        }
+    }
+
+    // 3) Calcula o bit de paridade global P0 (posição 0) sobre os bits 1..23
+    uint8_t paridadeGlobal = 0;
+    for (uint8_t pos = 1; pos <= 23; ++pos) {
+        paridadeGlobal ^= (uint8_t)((codificado >> pos) & 1UL);
+    }
+
+    if (paridadeGlobal) {
+        codificado |= 1UL; // bit 0
+    }
+
+    return codificado & MASCARA_FISICA;
+}
+
+// Extrai os 18 bits de dados de uma palavra física de 24 bits
+uint32_t extrairDados18(uint32_t palavraFisica24) {
+    uint32_t dados18 = 0;
+    for (uint8_t i = 0; i < BITS_PALAVRA; ++i) {
+        if ((palavraFisica24 >> POS_DADOS_HAMMING[i]) & 1UL) {
+            dados18 |= (1UL << i);
+        }
+    }
+    return dados18 & MASCARA_PALAVRA;
+}
+
+// Decodifica e verifica a integridade de uma palavra de 24 bits via SECDED.
+// Se houver erro simples (SEC), corrige a palavraFisica Corrigida e extrai os 18 bits.
+// Se houver erro duplo (DED), retorna ECC_DED_ERRO_DUPLO.
+StatusSECDED decodificarSECDED(uint32_t palavraRecebida, uint32_t *palavraFisicaCorrigida, uint32_t *dados18Saida, uint8_t *sindromeSaida, uint8_t *paridadeGlobalSaida) {
+    palavraRecebida &= MASCARA_FISICA;
+
+    // 1) Calcula o vetor de síndrome S (5 bits)
+    uint8_t sindrome = 0;
+    for (uint8_t k = 0; k < 5; ++k) {
+        uint8_t posParidade = (1U << k);
+        uint8_t paridadeGrupo = 0;
+
+        for (uint8_t pos = 1; pos <= 23; ++pos) {
+            if (pos & posParidade) {
+                paridadeGrupo ^= (uint8_t)((palavraRecebida >> pos) & 1UL);
+            }
+        }
+
+        if (paridadeGrupo) {
+            sindrome |= posParidade;
+        }
+    }
+
+    // 2) Calcula a paridade global P_total sobre todos os 24 bits (0..23)
+    uint8_t paridadeTotal = 0;
+    for (uint8_t pos = 0; pos < BITS_FISICOS; ++pos) {
+        paridadeTotal ^= (uint8_t)((palavraRecebida >> pos) & 1UL);
+    }
+
+    if (sindromeSaida != NULL) *sindromeSaida = sindrome;
+    if (paridadeGlobalSaida != NULL) *paridadeGlobalSaida = paridadeTotal;
+
+    uint32_t palavraCorrigida = palavraRecebida;
+    StatusSECDED status = ECC_OK;
+
+    if (sindrome == 0 && paridadeTotal == 0) {
+        // Sem erro
+        status = ECC_OK;
+    }
+    else if (paridadeTotal == 1) {
+        // Erro simples (SEC):
+        // - Se sindrome == 0, o bit flip ocorreu no próprio bit P0 (bit 0).
+        // - Se sindrome != 0 (1..23), o bit flip ocorreu na posição indicada pela síndrome.
+        // - Se sindrome > 23, múltiplos erros ímpares extrapolam o código, tratando como erro crítico.
+        if (sindrome > 23) {
+            status = ECC_DED_ERRO_DUPLO;
+        } else {
+            palavraCorrigida ^= (1UL << sindrome);
+            status = ECC_SEC_CORRIGIDO;
+        }
+    }
+    else {
+        // sindrome != 0 e paridadeTotal == 0 -> Erro Duplo Detectado (DED)
+        status = ECC_DED_ERRO_DUPLO;
+    }
+
+    if (palavraFisicaCorrigida != NULL) *palavraFisicaCorrigida = palavraCorrigida & MASCARA_FISICA;
+    if (dados18Saida != NULL) *dados18Saida = extrairDados18(palavraCorrigida);
+
+    return status;
 }
 
 // =============================== E/S =========================================
@@ -330,7 +473,6 @@ uint8_t faixaDisplay(uint8_t percentual) {
     return 9;
 }
 
-// Ordem: a,b,c,d,e,f,g. Padrão de display comum catodo.
 const bool SEGMENTOS[10][7] = {
     {1,1,1,1,1,1,0}, // 0
     {0,1,1,0,0,0,0}, // 1
@@ -370,9 +512,6 @@ int lerPercentualAnalogico(uint8_t indiceBomba) {
     if (indiceBomba >= 3) return -1;
 
     int raw = analogRead(PIN_NIVEL[indiceBomba]);
-
-    // Arredondamento para o inteiro mais próximo:
-    // percentual = round(raw * 100 / 1023)
     int percentual = (raw * 100L + 511L) / 1023L;
 
     if (percentual < 0) percentual = 0;
@@ -401,21 +540,71 @@ void lerNivelEExibir(uint8_t indiceBomba) {
 }
 
 // =============================== MEMORIA ====================================
+// A interface de memória aplica SECDED automaticamente:
+// - Escrita: codifica os 18 bits de MBR em 24 bits (SECDED) e grava em MEM_PROG[MAR].
+// - Leitura: lê os 24 bits de MEM_PROG[MAR], verifica Síndrome e Paridade Global,
+//   corrige automaticamente se houver erro de 1 bit (fazendo scrubbing em MEM_PROG)
+//   ou sinaliza falha se detectar erro de 2 bits (DED).
 bool MEMORIA(SinalMemoria sinal) {
     if (MAR >= TAM_MEMORIA) {
         return false;
     }
 
     switch (sinal) {
-        case MEM_LEITURA:
-            // Leitura sempre retorna os bits efetivamente armazenados.
-            MBR = MEM_PROG[MAR] & MASCARA_PALAVRA;
-            return true;
+        case MEM_LEITURA: {
+            uint32_t palavraLida = MEM_PROG[MAR] & MASCARA_FISICA;
+            uint32_t palavraCorrigida = 0;
+            uint32_t dados18 = 0;
 
-        case MEM_ESCRITA:
-            MEM_PROG[MAR] = MBR & MASCARA_PALAVRA;
-            MEM_OCUPADA[MAR] = true;
+            ECC_STATUS = decodificarSECDED(
+                palavraLida,
+                &palavraCorrigida,
+                &dados18,
+                &ECC_SINDROME,
+                &ECC_PARIDADE_GLOBAL
+            );
+
+            MBR_RAW = palavraCorrigida;
+            MBR = dados18 & MASCARA_PALAVRA;
+
+            if (ECC_STATUS == ECC_SEC_CORRIGIDO) {
+                // Memory Scrubbing: regrava o bit corrigido na memória física
+                MEM_PROG[MAR] = palavraCorrigida;
+                CONTADOR_SEC++;
+
+                Serial.print(F("[SECDED-SEC] 1 bit invertido detectado e corrigido em "));
+                imprimirEndereco(MAR);
+                Serial.print(F(" | Bit fisico corrigido (Sindrome)="));
+                Serial.print(ECC_SINDROME);
+                Serial.print(F(" | P_total="));
+                Serial.println(ECC_PARIDADE_GLOBAL);
+                return true;
+            }
+
+            if (ECC_STATUS == ECC_DED_ERRO_DUPLO) {
+                CONTADOR_DED++;
+                Serial.print(F("[SECDED-DED] ERRO DUPLO INrecuperavel em "));
+                imprimirEndereco(MAR);
+                Serial.print(F(" | Sindrome="));
+                Serial.print(ECC_SINDROME);
+                Serial.print(F(" | P_total="));
+                Serial.println(ECC_PARIDADE_GLOBAL);
+                return false;
+            }
+
             return true;
+        }
+
+        case MEM_ESCRITA: {
+            uint32_t palavraFisica = codificarSECDED(MBR & MASCARA_PALAVRA);
+            MEM_PROG[MAR] = palavraFisica;
+            MBR_RAW = palavraFisica;
+            MEM_OCUPADA[MAR] = true;
+            ECC_STATUS = ECC_OK;
+            ECC_SINDROME = 0;
+            ECC_PARIDADE_GLOBAL = 0;
+            return true;
+        }
 
         default:
             return false;
@@ -438,7 +627,6 @@ uint16_t contarPosicoesCarregadas() {
 }
 
 // ================================ Decoder ===================================
-// Recebe implicitamente a palavra completa em IR e separa os campos da ISA.
 Opcode DECODER() {
     IR &= MASCARA_PALAVRA;
 
@@ -531,7 +719,17 @@ bool validarDestinosDosDesvios() {
     for (uint16_t endereco = 0; endereco < instrucao_atual; ++endereco) {
         if (!MEM_OCUPADA[endereco]) continue;
 
-        uint32_t palavra = MEM_PROG[endereco] & MASCARA_PALAVRA;
+        uint32_t palavraFisica = MEM_PROG[endereco] & MASCARA_FISICA;
+        uint32_t palavra = 0;
+        StatusSECDED st = decodificarSECDED(palavraFisica, NULL, &palavra, NULL, NULL);
+
+        if (st == ECC_DED_ERRO_DUPLO) {
+            Serial.print(F("ERRO SECDED no endereco "));
+            imprimirEndereco((uint8_t)endereco);
+            Serial.println(F(": erro duplo detectado na validacao."));
+            return false;
+        }
+
         Opcode opcode = (Opcode)((palavra >> OPCODE_SHIFT) & 0x0F);
         uint8_t op1 = (palavra >> OPERANDO1_SHIFT) & MASCARA_7_BITS;
         uint8_t op2 = palavra & MASCARA_7_BITS;
@@ -634,27 +832,22 @@ bool montarPalavra(const char *mnem, const char *op1Texto, const char *op2Texto,
 bool ASSEMBLER(char *instrucao) {
     if (instrucao == NULL) return false;
 
-    // 1) Comentários não participam da montagem.
     removerComentario(instrucao);
     trimInPlace(instrucao);
     if (textoVazio(instrucao)) {
         return false;
     }
 
-    // 2) Montagem somente durante a carga.
     if (MODO != MODO_CARGA) {
         Serial.println(F("ERRO: novas instrucoes so podem ser carregadas apos LOAD."));
         return false;
     }
 
-    // 3) Não permitir escrita parcial ou ultrapassar 128 posições.
     if (instrucao_atual >= TAM_MEMORIA) {
         Serial.println(F("ERRO: memoria de programa cheia."));
         return false;
     }
 
-    // 4) Tokens: espaços e vírgulas separam operandos.
-    //    Assim CMP 1,30 e CMP 1, 30 resultam em dois operandos.
     char copia[LINE_BUFFER_SIZE];
     strncpy(copia, instrucao, sizeof(copia) - 1);
     copia[sizeof(copia) - 1] = '\0';
@@ -667,7 +860,6 @@ bool ASSEMBLER(char *instrucao) {
     char *op2Texto = strtok(NULL, " \t,");
     char *extra = strtok(NULL, " \t,");
 
-    // Se houver qualquer quarto token, há operandos extras.
     if (extra != NULL) {
         Serial.println(F("ERRO: excesso de operandos."));
         return false;
@@ -675,14 +867,11 @@ bool ASSEMBLER(char *instrucao) {
 
     uint32_t palavra = 0;
 
-    // 5) Tudo é montado primeiro em variável temporária.
-    //    A memória só é alterada depois de toda a validação.
     if (!montarPalavra(mnem, op1Texto, op2Texto, &palavra)) {
         Serial.println(F("ERRO: instrucao ou operandos invalidos."));
         return false;
     }
 
-    // 6) Usa MAR/MBR como interface de escrita da memória.
     MAR = (uint8_t)instrucao_atual;
     MBR = palavra;
 
@@ -691,11 +880,12 @@ bool ASSEMBLER(char *instrucao) {
         return false;
     }
 
-    // 7) Ponteiro avança somente após escrita válida.
     Serial.print(F("Montado em "));
     imprimirEndereco((uint8_t)instrucao_atual);
-    Serial.print(F(" | "));
+    Serial.print(F(" | ISA[18b]="));
     imprimirBinario18(palavra);
+    Serial.print(F(" | SECDED[24b]="));
+    imprimirBinario24(MBR_RAW);
     Serial.println();
 
     instrucao_atual++;
@@ -707,11 +897,16 @@ void resetarRegistradoresExecucao() {
     PC = 0;
     MAR = 0;
     MBR = 0;
+    MBR_RAW = 0;
     IR = 0;
     ACC = 0;
     OPCODE_REG = OP_INVALID;
     OP1 = 0;
     OP2 = 0;
+
+    ECC_SINDROME = 0;
+    ECC_PARIDADE_GLOBAL = 0;
+    ECC_STATUS = ECC_OK;
 
     for (uint8_t i = 0; i < 3; ++i) {
         NIVEL[i] = 0;
@@ -739,6 +934,8 @@ void resetarSistemaParaCarga() {
     limparMemoria();
     resetarRegistradoresExecucao();
 
+    CONTADOR_SEC = 0;
+    CONTADOR_DED = 0;
     instrucao_atual = 0;
     programaFinalizado = false;
     MODO = MODO_CARGA;
@@ -920,7 +1117,6 @@ void executarWAIT(uint8_t ticks) {
         return;
     }
 
-    // O PC avanca agora para que, ao terminar a espera, a proxima instrucao seja executada.
     if (!avancarPC()) return;
 
     waitTermino = millis() + ((uint32_t)ticks * WAIT_MS);
@@ -985,7 +1181,17 @@ void imprimirTrace(uint8_t enderecoExecutado, Opcode opcode, uint8_t op1, uint8_
     imprimirHex2(enderecoExecutado);
     Serial.println();
 
-    Serial.print(F("IR="));
+    Serial.print(F("SECDED[24b]="));
+    imprimirBinario24(MBR_RAW);
+    Serial.print(F(" | Status="));
+    Serial.print(NOME_ECC[ECC_STATUS]);
+    Serial.print(F(" (S="));
+    Serial.print(ECC_SINDROME);
+    Serial.print(F(", P0="));
+    Serial.print(ECC_PARIDADE_GLOBAL);
+    Serial.println(')');
+
+    Serial.print(F("IR[18b]="));
     imprimirBinario18(IR);
     Serial.println();
 
@@ -1029,9 +1235,6 @@ void imprimirTrace(uint8_t enderecoExecutado, Opcode opcode, uint8_t op1, uint8_
 }
 
 // ================================ UC ========================================
-// A UC coordena BUSCA -> DECODIFICA -> EXECUTA.
-// Os módulos não executam a instrução por conta própria: a UC chama cada
-// componente necessário e os dados circulam pelos registradores.
 void UC() {
     if (MODO != MODO_STEP && MODO != MODO_AUTO) {
         return;
@@ -1054,11 +1257,14 @@ void UC() {
 
     MAR = PC;
     if (!MEMORIA(MEM_LEITURA)) {
-        erroExecucao("falha na leitura da memoria durante a busca");
+        if (ECC_STATUS == ECC_DED_ERRO_DUPLO) {
+            erroExecucao("SECDED detectou ERRO DUPLO (DED) na memoria de programa");
+        } else {
+            erroExecucao("falha na leitura da memoria durante a busca");
+        }
         return;
     }
 
-    // MBR agora possui a palavra completa buscada.
     MBR &= MASCARA_PALAVRA;
 
     // --------------------------- DECODIFICA ----------------------------------
@@ -1099,7 +1305,6 @@ void UC() {
         return;
     }
 
-    // Clock da CPU simulada: uma transicao por instrucao executada.
     CLOCK = !CLOCK;
 
     bool mostrarProximoPC = (MODO != MODO_HALT && MODO != MODO_ERRO);
@@ -1120,9 +1325,7 @@ void comandoMEM(char *comando) {
     char *token = strtok(copia, " \t"); // MEM
     token = strtok(NULL, " \t");
 
-    if (token == NULL) {
-        // MEM -> memoria completa.
-    } else {
+    if (token != NULL) {
         if (!parseEnderecoHex(token, &inicio)) {
             Serial.println(F("ERRO: endereco inicial invalido. Use 0x00..0x7F."));
             return;
@@ -1150,29 +1353,89 @@ void comandoMEM(char *comando) {
         }
     }
 
-    // Consulta não deve alterar o estado arquitetural observado pelo usuário.
-    uint8_t marBackup = MAR;
-    uint32_t mbrBackup = MBR;
-
     Serial.print(F("Posicoes carregadas: "));
     Serial.println(contarPosicoesCarregadas());
-    Serial.println(F("END | PALAVRA BINARIA"));
+    Serial.println(F("END  | PALAVRA FISICA SECDED (24b) | DADOS ISA (18b)    | ECC STATUS"));
 
     for (uint16_t endereco = inicio; endereco <= fim; ++endereco) {
-        MAR = (uint8_t)endereco;
-        MEMORIA(MEM_LEITURA);
+        uint32_t palavraFisica = MEM_PROG[endereco] & MASCARA_FISICA;
+        uint32_t dados18 = 0;
+        uint8_t sind = 0;
+        uint8_t pglob = 0;
+        StatusSECDED st = decodificarSECDED(palavraFisica, NULL, &dados18, &sind, &pglob);
 
         Serial.print(F("0x"));
         imprimirHex2((uint8_t)endereco);
         Serial.print(F(" | "));
-        imprimirBinario18(MBR);
+        imprimirBinario24(palavraFisica);
+        Serial.print(F("    | "));
+        imprimirBinario18(dados18);
+        Serial.print(F(" | "));
+        if (!MEM_OCUPADA[endereco] && palavraFisica == 0) {
+            Serial.println(F("VAZIA"));
+        } else {
+            Serial.print(NOME_ECC[st]);
+            if (st != ECC_OK) {
+                Serial.print(F(" [S="));
+                Serial.print(sind);
+                Serial.print(F(",P0="));
+                Serial.print(pglob);
+                Serial.print(']');
+            }
+            Serial.println();
+        }
+    }
+}
 
-        // A coluna é somente a palavra binária; ocupação fica separada.
-        Serial.println();
+// Comando FLIP <endereco> <bit_fisico 0..23> para injetar falhas na memória e testar SECDED
+void comandoFLIP(char *comando) {
+    char copia[LINE_BUFFER_SIZE];
+    strncpy(copia, comando, sizeof(copia) - 1);
+    copia[sizeof(copia) - 1] = '\0';
+
+    char *token = strtok(copia, " \t"); // FLIP
+    char *endTexto = strtok(NULL, " \t");
+    char *bitTexto = strtok(NULL, " \t");
+    char *extra = strtok(NULL, " \t");
+
+    if (endTexto == NULL || bitTexto == NULL || extra != NULL) {
+        Serial.println(F("ERRO: uso correto -> FLIP 0x00 <bit 0..23>"));
+        return;
     }
 
-    MAR = marBackup;
-    MBR = mbrBackup;
+    uint8_t endereco = 0;
+    if (!parseEnderecoHex(endTexto, &endereco)) {
+        Serial.println(F("ERRO: endereco invalido. Use 0x00..0x7F."));
+        return;
+    }
+
+    int bit = 0;
+    if (!parseDecimal(bitTexto, 0, BITS_FISICOS - 1, &bit)) {
+        Serial.println(F("ERRO: bit invalido. Informe um indice fisico de 0 a 23."));
+        return;
+    }
+
+    MEM_PROG[endereco] ^= (1UL << bit);
+    MEM_PROG[endereco] &= MASCARA_FISICA;
+
+    uint32_t dadosExtraidos = 0;
+    uint8_t sind = 0;
+    uint8_t pglob = 0;
+    StatusSECDED st = decodificarSECDED(MEM_PROG[endereco], NULL, &dadosExtraidos, &sind, &pglob);
+
+    Serial.print(F("FLIP aplicado em "));
+    imprimirEndereco(endereco);
+    Serial.print(F(" no bit fisico "));
+    Serial.print(bit);
+    Serial.print(F(" | SECDED[24b]="));
+    imprimirBinario24(MEM_PROG[endereco]);
+    Serial.print(F(" | Diagnostico esperado: "));
+    Serial.print(NOME_ECC[st]);
+    Serial.print(F(" (S="));
+    Serial.print(sind);
+    Serial.print(F(", P0="));
+    Serial.print(pglob);
+    Serial.println(')');
 }
 
 void comandoSTATUS() {
@@ -1213,13 +1476,28 @@ void comandoSTATUS() {
     if (MAR >= TAM_MEMORIA) Serial.print(MAR, HEX);
     Serial.println();
 
-    Serial.print(F("MBR="));
+    Serial.print(F("MBR_RAW[24b]="));
+    imprimirBinario24(MBR_RAW);
+    Serial.println();
+
+    Serial.print(F("MBR[18b]="));
     imprimirBinario18(MBR);
     Serial.println();
 
-    Serial.print(F("IR="));
+    Serial.print(F("IR[18b]="));
     imprimirBinario18(IR);
     Serial.println();
+
+    Serial.print(F("SECDED Ultimo Acesso: "));
+    Serial.print(NOME_ECC[ECC_STATUS]);
+    Serial.print(F(" | Sindrome="));
+    Serial.print(ECC_SINDROME);
+    Serial.print(F(" | P0="));
+    Serial.print(ECC_PARIDADE_GLOBAL);
+    Serial.print(F(" | Total SEC="));
+    Serial.print(CONTADOR_SEC);
+    Serial.print(F(" | Total DED="));
+    Serial.println(CONTADOR_DED);
 
     Serial.print(F("OPCODE="));
     if (OPCODE_REG <= OP_HALT) {
@@ -1372,13 +1650,11 @@ void processarLinha(char *linha) {
     trimInPlace(linha);
 
     if (textoVazio(linha)) {
-        // Linha vazia/comentário não ocupa memória.
         return;
     }
 
     paraMaiusculas(linha);
 
-    // Comandos do ambiente não são instruções da ISA e não ocupam memória.
     if (strcmp(linha, "LOAD") == 0) {
         comandoLOAD();
         return;
@@ -1414,13 +1690,16 @@ void processarLinha(char *linha) {
         return;
     }
 
-    // MEM pode ser apenas "MEM" ou "MEM 0x00 0x0F".
     if (strncmp(linha, "MEM", 3) == 0 && (linha[3] == '\0' || linha[3] == ' ' || linha[3] == '\t')) {
         comandoMEM(linha);
         return;
     }
 
-    // Somente durante carga uma linha Assembly pode ser montada.
+    if (strncmp(linha, "FLIP", 4) == 0 && (linha[4] == ' ' || linha[4] == '\t')) {
+        comandoFLIP(linha);
+        return;
+    }
+
     if (MODO == MODO_CARGA) {
         ASSEMBLER(linha);
         return;
@@ -1449,7 +1728,6 @@ void processarMonitorSerial() {
             linhaSerial[posLinhaSerial++] = c;
             linhaSerial[posLinhaSerial] = '\0';
         } else {
-            // Descarta até Enter para não montar uma linha truncada.
             posLinhaSerial = 0;
             linhaSerial[0] = '\0';
             Serial.println(F("ERRO: linha longa demais."));
@@ -1492,26 +1770,22 @@ void setup() {
     MODO = MODO_CARGA;
     programaFinalizado = false;
 
-    Serial.println(F("============================================"));
-    Serial.println(F("CPU SIMULADA - 18 bits / 128 palavras"));
+    Serial.println(F("=========================================================="));
+    Serial.println(F("CPU SIMULADA - 18 bits ISA / 24 bits SECDED / 128 palavras"));
     Serial.println(F("Digite LOAD para iniciar uma nova carga."));
-    Serial.println(F("============================================"));
+    Serial.println(F("Use FLIP 0x00 <0..23> para simular falhas de bit na RAM."));
+    Serial.println(F("=========================================================="));
 }
 
 void loop() {
-    // Atendimento ao monitor acontece continuamente, inclusive em AUTO/WAIT.
     processarMonitorSerial();
-
-    // WAIT nunca bloqueia o loop: millis() determina quando liberar a próxima instrução.
     atualizarWAIT();
 
-    // STEP executa somente quando solicitado explicitamente.
     if (MODO == MODO_STEP && stepSolicitado) {
         stepSolicitado = false;
         UC();
     }
 
-    // AUTO executa uma instrução por passagem do loop.
     if (MODO == MODO_AUTO) {
         UC();
     }

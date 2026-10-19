@@ -1,23 +1,31 @@
- # Documentação da Arquitetura — Sistema Programável de Três Bombas
+# Documentação da Arquitetura — Sistema Programável de Três Bombas (com SECDED)
 
 ## 1. Visão geral
 
-Este projeto implementa, sobre um **Arduino Mega 2560**, uma arquitetura de computador simulada para monitoramento e controle de três reservatórios.
+Este projeto implementa, sobre um **Arduino Mega 2560**, uma arquitetura de computador simulada para monitoramento e controle de três reservatórios industriais.
 
-A aplicação física utiliza três potenciômetros como entradas analógicas, representando os níveis dos reservatórios, e LEDs para representar as bombas e os indicadores de manutenção. O programa que controla o sistema é escrito em uma **ISA própria**, em Assembly, carregado pelo monitor serial e convertido pelo montador para palavras binárias armazenadas em uma memória de programa simulada.
+A aplicação física utiliza três potenciômetros como entradas analógicas (níveis dos reservatórios), LEDs e buzzer como atuadores/alarmes, e um display de 7 segmentos para telemetria. O programa que controla o sistema é escrito em uma **ISA própria**, montado e carregado via monitor serial.
 
-A execução é realizada segundo o modelo clássico de **programa armazenado**, seguindo o ciclo:
+Para garantir alta confiabilidade e tolerância a falhas na memória simulada, foi incorporado um controlador de código de correção de erros com tecnologia **SECDED (*Single Error Correction, Double Error Detection*)** baseado no código de Hamming Estendido (24,18).
+
+A execução segue o modelo clássico de **programa armazenado com ECC e *memory scrubbing***:
 
 ```text
 Assembly
    ↓
 ASSEMBLER
    ↓
-Palavra binária de 18 bits
+Palavra lógica da ISA (18 bits)
    ↓
-MEM_PROG
+Codificador SECDED (Hamming 24,18)
    ↓
-Busca
+MEM_PROG (Palavra física de 24 bits)
+   ↓
+Busca (MAR → Leitura física)
+   ↓
+Decodificador & Verificador SECDED ──[Erro 1 bit]──> Scrubbing (auto-correção na RAM)
+   ↓                                ──[Erro 2 bits]─> Interrupção / MODO_ERRO (DED)
+MBR (18 bits lógicos corrigidos)
    ↓
 IR
    ↓
@@ -26,9 +34,8 @@ DECODER
 UC
    ↓
 ULA / E-S / PC / ACC / FLAGS
-```
 
-A arquitetura simulada é independente da arquitetura interna do ATmega2560. O microcontrolador fornece os recursos físicos necessários para executar o simulador, enquanto UC, ULA, memória, registradores, Decoder e ISA são estruturas implementadas em software.
+```
 
 ---
 
@@ -37,987 +44,278 @@ A arquitetura simulada é independente da arquitetura interna do ATmega2560. O m
 Os principais módulos da arquitetura são:
 
 ```text
-                         ┌───────────────────────┐
-                         │          UC           │
-                         │ Busca / Decodificação │
-                         │       / Execução      │
-                         └───────────┬───────────┘
-                                     │
-                                  DECODER
-                                     │
-              ┌──────────────────────┼──────────────────────┐
-              │                      │                      │
-             ULA                  MEMÓRIA                  E/S
-              │                      │                      │
-        ACC / FLAGS             MAR / MBR             Entradas / Saídas
-                                     │
-                                    IR
-                                     │
-                                    PC
+                               ┌───────────────────────┐
+                               │          UC           │
+                               │ Busca / Decodificação │
+                               │       / Execução      │
+                               └───────────┬───────────┘
+                                           │
+                                        DECODER
+                                           │
+              ┌────────────────────────────┼────────────────────────────┐
+              │                            │                            │
+             ULA                    SUBSISTEMA MEMÓRIA                 E/S
+              │                     ┌──────────────────┐                │
+        ACC / FLAGS                 │ Controlador ECC  │        Entradas / Saídas
+                                    │ (SECDED 24,18)   │                │
+                                    └────────┬─────────┘                │
+                                             │                          │
+                                    MEM_PROG (24 bits)                  │
+                                             │                          │
+                                   MAR / MBR / MBR_RAW                  │
+                                             │                          │
+                                            IR                          │
+                                             │                          │
+                                            PC ─────────────────────────┘
+
 ```
 
 ### 2.1 Unidade de Controle (UC)
 
-A UC é responsável por coordenar o ciclo de instrução. Ela determina a sequência de operações dos demais módulos.
+A UC coordena o ciclo de instrução e monitora a integridade de dados:
 
-O ciclo interno é dividido em três fases principais:
+1. **BUSCA:** carrega o endereço do `PC` no `MAR` e invoca `MEMORIA(MEM_LEITURA)`. Se for detectado erro irrecuperável de 2 bits (DED), a UC aborta imediatamente a execução e transiciona para `MODO_ERRO`. Havendo erro simples (SEC), ele é corrigido transparentemente, a memória é reparada (*scrubbing*) e o valor decodificado segue para o `MBR`.
 
-1. **BUSCA** — utiliza o `PC` para localizar a próxima instrução, coloca o endereço no `MAR`, solicita leitura à memória e recebe a palavra no `MBR`.
-2. **DECODIFICAÇÃO** — copia a palavra do `MBR` para o `IR` e utiliza o `DECODER` para extrair opcode e operandos.
-3. **EXECUÇÃO** — chama o módulo necessário para realizar a operação e atualiza os registradores e o `PC`.
 
-A UC, portanto, é o elemento que faz a comunicação entre os módulos por meio dos registradores.
+2. **DECODIFICAÇÃO:** transfere a palavra lógica do `MBR` para o `IR` e extrai opcode e operandos através do `DECODER`.
+
+
+3. **EXECUÇÃO:** executa a operação na ULA, nas saídas de hardware ou no fluxo de controle (`PC`), atualizando os registradores de estado.
+
+
 
 ### 2.2 Decoder
 
-O Decoder recebe a palavra armazenada em `IR` e separa seus campos:
+Recebe os 18 bits de `IR`:
 
 ```text
-IR[17..14] → OPCODE
-IR[13..7]  → OPERANDO 1
-IR[6..0]   → OPERANDO 2
-```
+IR[17..14] → OPCODE (4 bits)
+IR[13..7]  → OPERANDO 1 (7 bits)
+IR[6..0]   → OPERANDO 2 (7 bits)
 
-O opcode é convertido em uma instrução da ISA. O código `1111` é reservado para combinação inválida.
+```
 
 ### 2.3 Unidade Lógica e Aritmética (ULA)
 
-A ULA realiza a operação aritmética utilizada por `CMP`:
+Executa a subtração utilizada por `CMP`:
 
-```text
-NIVEL[x] - n
-```
 
-O resultado é colocado em `ACC` e utilizado para atualizar os três indicadores de comparação:
+$$\text{ACC} = \text{NIVEL}[x] - n$$
 
-```text
-FLAG_L → resultado < 0
-FLAG_Z → resultado = 0
-FLAG_G → resultado > 0
-```
 
-Exemplo:
+Atualizando os sinalizadores `FLAG_L` ($<0$), `FLAG_Z` ($=0$) e `FLAG_G` ($>0$).
 
-```text
-NIVEL = 20
-limite = 30
+### 2.4 Subsistema de Memória e Controlador SECDED
 
-ULA:
-20 - 30 = -10
+A interface da memória é responsável pelo isolamento entre a representação lógica da ISA (18 bits) e a representação física no armazenamento (24 bits). O controlador intercepta todos os acessos:
 
-ACC    = -10
-FLAG_L = 1
-FLAG_Z = 0
-FLAG_G = 0
-```
+* **Na escrita (`MEM_ESCRITA`):** gera os 5 bits de paridade de Hamming e 1 bit de paridade global, gravando a palavra física de 24 bits.
 
-### 2.4 Memória
 
-`MEM_PROG` é a memória de programa da arquitetura simulada. Cada posição armazena uma instrução completa, sem necessidade de dividir uma instrução entre posições diferentes.
+* **Na leitura (`MEM_LEITURA`):** calcula o vetor de síndrome e a paridade total. Se encontrar um bit corrompido, inverte o bit para corrigi-lo, reescreve a palavra corrigida na memória física (*memory scrubbing*) e incrementa `CONTADOR_SEC`. Se detectar 2 bits invertidos, gera alarme de erro crítico, incrementa `CONTADOR_DED` e impede a instrução de executar.
 
-A implementação também possui `MEM_OCUPADA`, que informa quais posições realmente foram carregadas. Dessa forma, uma palavra composta apenas por zeros não é confundida com uma posição vazia.
 
-### 2.5 Entrada e saída
-
-As funções de E/S conectam a arquitetura simulada ao hardware do Arduino:
-
-- leitura dos três potenciômetros;
-- acionamento das três bombas representadas por LEDs;
-- LEDs de manutenção preventiva;
-- buzzer para alarmes corretivos;
-- display de sete segmentos.
 
 ---
 
-# 3. Definição da palavra da ISA
+## 3. Definição da palavra da ISA e Proteção SECDED
 
-## 3.1 Largura da palavra
+### 3.1 Palavra lógica da ISA (18 bits)
 
-A arquitetura utiliza uma **palavra de 18 bits**.
-
-A palavra é dividida em três campos de tamanho fixo:
+A ISA opera sobre uma palavra lógica de **18 bits**, invariável para todas as instruções:
 
 ```text
 17                         14 13                       7 6             0
 ┌────────────────────────────┬───────────────────────────┬───────────────┐
-│          OPCODE            │       OPERANDO 1         │  OPERANDO 2   │
-│           4 bits           │          7 bits          │    7 bits     │
+│          OPCODE            │       OPERANDO 1          │  OPERANDO 2   │
+│           4 bits           │          7 bits           │    7 bits     │
 └────────────────────────────┴───────────────────────────┴───────────────┘
+
 ```
 
-Logo:
+* **4 bits de Opcode:** comportam as 15 instruções ativas (`0000` a `1110`) e 1 código reservado/inválido (`1111`).
 
-```text
-4 + 7 + 7 = 18 bits
-```
 
-A escolha de 18 bits é justificada pelos requisitos da ISA e pelo maior formato de instrução utilizado pelo projeto: `CMP x,n`, que necessita de dois operandos.
+* **7 bits de Operando 1:** suportam endereços de 0 a 127 (`0x00` a `0x7F`), identificação de bomba (`1..3`) ou tempos de espera `WAIT` (`0..127 ticks` = `0..12,7 s`).
 
-### 3.2 Justificativa dos 4 bits de opcode
 
-A ISA possui 15 instruções:
+* **7 bits de Operando 2:** suportam percentuais de 0 a 100 (`CMP`) ou preenchimento com zeros.
 
-```text
-READ
-ON
-OFF
-ALARM
-LED
-INFO
-SILENCE
-LEDOFF
-CMP
-JMP
-JL
-JE
-JG
-WAIT
-HALT
-```
 
-Para representar 15 códigos distintos, são necessários 4 bits:
 
-```text
-2^3 = 8   → insuficiente
-2^4 = 16  → suficiente
-```
+### 3.2 Palavra física de armazenamento com SECDED (24 bits)
 
-Assim, quatro bits permitem representar os 15 opcodes utilizados e ainda deixam uma combinação disponível:
+Para proteger a palavra de 18 bits contra corrupção por radiação ou ruído elétrico (*single-event upsets* / *bit-flips*), implementou-se o código **Hamming Estendido $(24, 18)$**, adicionando 6 bits de redundância (5 bits de paridade intercalados + 1 bit de paridade global):
 
-```text
-1111 → opcode inválido/reservado
-```
+$$\text{Bits físicos} = 18 \text{ bits dados} + 5 \text{ bits Hamming } (P_1, P_2, P_4, P_8, P_{16}) + 1 \text{ bit Global } (P_0) = 24 \text{ bits}$$
 
-### 3.3 Justificativa dos campos de 7 bits
+#### Mapeamento de posições físicas (1 a 23 + bit 0):
 
-Cada operando possui 7 bits porque o projeto utiliza endereços de 7 bits e a memória possui 128 posições.
+* **Bit 0 ($P_0$):** Paridade global de paridade par, calculada sobre todas as posições $1..23$.
 
-Com 7 bits, temos:
 
-```text
-2^7 = 128 valores
-```
+* **Potências de 2 ($1, 2, 4, 8, 16$):** Bits de paridade do código de Hamming ($P_1, P_2, P_4, P_8, P_{16}$).
 
-Portanto, é possível representar exatamente todos os endereços:
 
-```text
-0000000 → 0x00
-1111111 → 0x7F
-```
+* **Demais posições:** Os 18 bits de dados da ISA ($D_0$ a $D_{17}$), mapeados conforme a tabela:
 
-Além dos endereços, o campo também é suficiente para representar:
+| Bit ISA | $D_0$ | $D_1$ | $D_2$ | $D_3$ | $D_4$ | $D_5$ | $D_6$ | $D_7$ | $D_8$ | $D_9$ | $D_{10}$ | $D_{11}$ | $D_{12}$ | $D_{13}$ | $D_{14}$ | $D_{15}$ | $D_{16}$ | $D_{17}$ |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| **Pos. Física**<br> | 3 | 5 | 6 | 7 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 17 | 18 | 19 | 20 | 21 | 22 | 23 |
 
-- bombas `1`, `2` e `3`;
-- percentuais de `0` a `100`;
-- tempos de espera dentro da faixa representável pela ISA.
+### 3.3 Mecanismo de Diagnóstico e Correção
 
-### 3.4 Por que não utilizar uma palavra maior?
+O controlador avalia dois fatores no ciclo de leitura:
 
-Uma palavra de 18 bits é suficiente para o conjunto de instruções definido. Aumentá-la para 24 ou 32 bits não acrescentaria capacidade funcional necessária à ISA atual, pois:
+1. **Síndrome ($S$ - 5 bits):** calculada verificando as paridades de grupo nas posições $1..23$.
 
-- o opcode já cabe em 4 bits;
-- um endereço já cabe em 7 bits;
-- `CMP` utiliza dois operandos de 7 bits;
-- os campos restantes não são necessários para as instruções atuais.
 
-Portanto, 18 bits representam a menor largura natural para o formato escolhido:
+2. **Paridade Global Total ($P_{\text{total}}$):** paridade de todos os 24 bits.
 
-```text
-OPCODE + OPERANDO 1 + OPERANDO 2
-   4   +      7     +      7
-   = 18 bits
-```
 
-Os campos não utilizados por determinadas instruções são preenchidos com zero. Isso mantém todas as instruções com o mesmo tamanho e simplifica a busca e a decodificação.
+
+| $S$ | $P_{\text{total}}$ | Classificação | Ação do Sistema
+
+ |
+| --- | --- | --- | --- |
+| $= 0$ | $0$ | **ECC_OK** | Nenhuma inversão. Dados lidos diretamente. |
+| $\neq 0$ (ou $S=0$) | $1$ | **ECC_SEC_CORRIGIDO** | **Erro Simples (1 bit):** A síndrome indica exatamente a posição física do bit invertido ($1..23$). Se $S=0$, o erro foi no bit $P_0$. O bit é invertido em hardware simulado, corrigido em `MBR` e regravado em `MEM_PROG[MAR]` (*memory scrubbing*). |
+| $\neq 0$ | $0$ | **ECC_DED_ERRO_DUPLO** | **Erro Duplo Detectado (2 bits):** Falha crítica irrecuperável. A leitura falha, a UC interrompe a execução com erro e o processador entra em `MODO_ERRO`. |
 
 ---
 
-# 4. Tamanho e capacidade da memória
+## 4. Tamanho e capacidade da memória
 
-## 4.1 Quantidade de posições
+### 4.1 Quantidade de posições e endereçamento
 
-A memória possui **128 posições**.
+A memória possui **128 posições** indexadas de `0x00` a `0x7F` (7 bits de endereço).
 
-Como cada endereço é representado por 7 bits:
+### 4.2 Capacidade Lógica vs. Física
 
-```text
-2^7 = 128 posições
-```
+* **Capacidade Lógica da ISA:**
 
-Os endereços válidos são:
+$$128 \times 18 \text{ bits} = 2304 \text{ bits} = 288 \text{ bytes de dados úteis}$$
 
-```text
-0x00 até 0x7F
-```
 
-A numeração decimal correspondente é:
 
-```text
-0 até 127
-```
+* **Capacidade Física Efetiva (com SECDED):**
 
-Cada posição armazena uma instrução completa de 18 bits.
+$$128 \times 24 \text{ bits} = 3072 \text{ bits} = 384 \text{ bytes físicos}$$
 
-## 4.2 Capacidade lógica da memória
 
-A capacidade lógica é calculada por:
+* **Armazenamento em C++ (`uint32_t MEM_PROG[128]`):**
 
-```text
-quantidade de posições × tamanho da palavra
+$$128 \times 32 \text{ bits} = 512 \text{ bytes}$$
 
-128 × 18 = 2304 bits
-```
 
-Convertendo para bytes:
 
-```text
-2304 / 8 = 288 bytes
-```
 
-Portanto, a memória de programa possui uma capacidade arquitetural de:
+(Os 8 bits mais significativos de cada inteiro de 32 bits são descartados pela máscara `0xFFFFFFUL`).
 
-> **2304 bits = 288 bytes de informação útil.**
 
-Outra forma de expressar a capacidade é:
-
-```text
-128 palavras × 18 bits por palavra
-```
-
-## 4.3 Capacidade de endereçamento
-
-Como cada endereço aponta diretamente para uma palavra completa, uma posição de memória corresponde a uma instrução inteira:
-
-```text
-0x00 → palavra 0
-0x01 → palavra 1
-0x02 → palavra 2
-...
-0x7F → palavra 127
-```
-
-Isso significa que a arquitetura não precisa utilizar posições consecutivas para montar uma instrução de `18 bits`.
-
-## 4.4 Representação da memória no código
-
-No sketch, a memória é implementada como:
-
-```c
-uint32_t MEM_PROG[TAM_MEMORIA];
-```
-
-com:
-
-```c
-#define TAM_MEMORIA 128
-```
-
-Embora cada posição utilize um `uint32_t` por conveniência de armazenamento e manipulação no Arduino, apenas os **18 bits menos significativos** são considerados parte da palavra da arquitetura:
-
-```text
-32 bits físicos de armazenamento
-┌────────────────────────────────┐
-│              14               │ 18 bits usados │
-└────────────────────────────────┘
-                               ↑
-                         palavra da ISA
-```
-
-Assim, existe uma diferença entre:
-
-- **capacidade lógica da memória:** `128 × 18 = 2304 bits = 288 bytes`;
-- **armazenamento utilizado pelo array `MEM_PROG`:** `128 × 32 = 4096 bits = 512 bytes`.
-
-O espaço adicional no `uint32_t` não representa memória arquitetural adicional; ele é apenas uma estratégia de implementação para armazenar e manipular facilmente uma palavra de 18 bits.
-
-Além disso, o projeto mantém:
-
-```c
-bool MEM_OCUPADA[TAM_MEMORIA];
-```
-
-para controlar quais posições foram carregadas.
 
 ---
 
-# 5. Registradores da arquitetura
+## 5. Registradores da arquitetura
 
 | Registrador | Largura / tipo | Função |
-|---|---:|---|
-| `PC` | 7 bits efetivos | Endereço da próxima instrução |
-| `MAR` | 7 bits efetivos | Endereço utilizado no acesso à memória |
-| `MBR` | 18 bits efetivos | Palavra transferida entre memória e CPU |
-| `IR` | 18 bits efetivos | Palavra completa da instrução atual |
-| `ACC` | `int16_t` | Resultado de `READ`, `INFO` e `CMP` |
-| `OPCODE_REG` | 4 bits | Opcode extraído do `IR` |
-| `OP1` | 7 bits | Primeiro operando |
-| `OP2` | 7 bits | Segundo operando |
-| `NIVEL[3]` | 7 bits úteis | Último nível válido de cada reservatório |
-| `NIVEL_VALIDO[3]` | booleano | Indica se existe leitura válida |
-| `FLAG_L` | 1 bit | Resultado menor que zero |
-| `FLAG_Z` | 1 bit | Resultado igual a zero |
-| `FLAG_G` | 1 bit | Resultado maior que zero |
-| `COMPARACAO_VALIDA` | booleano | Indica existência de comparação válida |
-
-O `ACC` utiliza um tipo assinado porque `CMP` pode produzir valores negativos. A faixa necessária é pequena:
-
-```text
--100 ≤ ACC ≤ +100
-```
+| --- | --- | --- |
+| `PC` | 7 bits | Contador de programa (próxima instrução)|
+| `MAR` | 7 bits | Registrador de endereço de memória|
+| `MBR` | 18 bits | Registrador de dados da memória (palavra lógica da ISA decodificada)|
+| `MBR_RAW` | 24 bits | Palavra física lida/escrita na memória (inclui bits SECDED)|
+| `IR` | 18 bits | Registrador de instrução em execução|
+| `ECC_SINDROME` | 5 bits | Síndrome calculada no último acesso (0..23) |
+| `ECC_PARIDADE_GLOBAL` | 1 bit | Paridade total calculada no último acesso |
+| `ECC_STATUS` | Enum | Estado do SECDED (`OK`, `SEC_CORRIGIDO`, `DED_ERRO_DUPLO`) |
+| `CONTADOR_SEC` | 16 bits | Contador acumulado de erros simples corrigidos desde o último `LOAD`<br> |
+| `CONTADOR_DED` | 16 bits | Contador acumulado de erros duplos detectados desde o último `LOAD`<br> |
+| `ACC` | `int16_t` | Acumulador assinado (armazena leituras e resultados da ULA) |
+| `OPCODE_REG` | 4 bits | Código da operação decodificada |
+| `OP1`, `OP2` | 7 bits cada | Operandos decodificados da instrução |
+| `FLAGS (L, Z, G)` | 1 bit cada | Indicadores condicionais da ULA ($<, =, >$) |
 
 ---
 
-# 6. Formato das instruções
+## 6. Formato e Conjunto de Instruções
 
-A ISA utiliza um formato geral de 18 bits:
+A ISA possui formato fixo de 18 bits (`OPCODE [4] | OP1 [7] | OP2 [7]`):
 
-```text
-OPCODE | OPERANDO 1 | OPERANDO 2
-  4          7            7
-```
-
-Nem toda instrução utiliza os dois operandos. Os campos não utilizados recebem zero.
-
-| Instrução | Opcode | Operando 1 | Operando 2 |
-|---|---|---|---|
-| `READ x` | `0000` | bomba | `0000000` |
-| `ON x` | `0001` | bomba | `0000000` |
-| `OFF x` | `0010` | bomba | `0000000` |
-| `ALARM x` | `0011` | bomba | `0000000` |
-| `LED x` | `0100` | bomba | `0000000` |
-| `INFO x` | `0101` | bomba | `0000000` |
-| `SILENCE x` | `0110` | bomba | `0000000` |
-| `LEDOFF x` | `0111` | bomba | `0000000` |
-| `CMP x,n` | `1000` | bomba | percentual |
-| `JMP a` | `1001` | endereço | `0000000` |
-| `JL a` | `1010` | endereço | `0000000` |
-| `JE a` | `1011` | endereço | `0000000` |
-| `JG a` | `1100` | endereço | `0000000` |
-| `WAIT t` | `1101` | tempo | `0000000` |
-| `HALT` | `1110` | `0000000` | `0000000` |
-| inválido | `1111` | — | — |
+| Mnemônico | Opcode | OP1 (7b) | OP2 (7b) | Descrição|
+| --- | --- | --- | --- | --- |
+| `READ x` | `0000` | Bomba (1..3) | `0000000` | Lê nível analógico (0..100%), salva em `NIVEL[x]` e `ACC`. |
+| `ON x` | `0001` | Bomba (1..3) | `0000000` | Aciona a bomba `x`. |
+| `OFF x` | `0010` | Bomba (1..3) | `0000000` | Desliga a bomba `x`. |
+| `ALARM x` | `0011` | Bomba (1..3) | `0000000` | Ativa alarme corretivo da bomba `x` e aciona buzzer. |
+| `LED x` | `0100` | Bomba (1..3) | `0000000` | Liga LED de manutenção preventiva da bomba `x`. |
+| `INFO x` | `0101` | Bomba (1..3) | `0000000` | Lê nível, exibe faixa no display de 7 segmentos e atualiza `ACC`. |
+| `SILENCE x` | `0110` | Bomba (1..3) | `0000000` | Desativa alarme corretivo da bomba `x`. |
+| `LEDOFF x` | `0111` | Bomba (1..3) | `0000000` | Desliga LED de manutenção preventiva da bomba `x`. |
+| `CMP x,n` | `1000` | Bomba (1..3) | Limite (0..100) | Calcula `NIVEL[x] - n` via ULA e atualiza `ACC` e flags `L`, `Z`, `G`. |
+| `JMP a` | `1001` | Endereço (0x00..0x7F) | `0000000` | Desvio incondicional para `a`. |
+| `JL a` | `1010` | Endereço (0x00..0x7F) | `0000000` | Desvia para `a` se `FLAG_L == 1`. |
+| `JE a` | `1011` | Endereço (0x00..0x7F) | `0000000` | Desvia para `a` se `FLAG_Z == 1`. |
+| `JG a` | `1100` | Endereço (0x00..0x7F) | `0000000` | Desvia para `a` se `FLAG_G == 1`. |
+| `WAIT t` | `1101` | Ticks (0..127) | `0000000` | Pausa por $t \times 100\text{ ms}$ de forma não bloqueante. |
+| `HALT` | `1110` | `0000000` | `0000000` | Encerra a execução mantendo estados dos atuadores. |
 
 ---
 
-# 7. Tipos de operandos
+## 7. Comandos do Monitor Serial
 
-## 7.1 Identificação de bomba
-
-As instruções relacionadas às bombas utilizam:
-
-```text
-x ∈ {1, 2, 3}
-```
-
-Exemplos:
-
-```asm
-READ 1
-ON 2
-OFF 3
-INFO 1
-```
-
-O valor é escrito em decimal no Assembly e ocupa 7 bits na palavra binária.
-
-## 7.2 Percentual
-
-O segundo operando de `CMP` representa um percentual:
-
-```text
-0 ≤ n ≤ 100
-```
-
-Exemplo:
-
-```asm
-CMP 1, 30
-```
-
-O primeiro campo representa a bomba e o segundo representa o limite de comparação.
-
-## 7.3 Endereço
-
-Os destinos dos desvios são obrigatoriamente informados em hexadecimal com prefixo `0x` e dois dígitos:
-
-```asm
-JMP 0x0A
-JL 0x10
-JE 0x20
-JG 0x7F
-```
-
-A restrição `0x00..0x7F` corresponde diretamente às 128 posições da memória.
-
-## 7.4 Tempo de `WAIT`
-
-O formato da ISA reserva 7 bits para o argumento de `WAIT`. Portanto, um valor diretamente armazenável nesse campo está na faixa:
-
-```text
-0..127
-```
-
-Cada unidade representa 100 ms.
-
-Assim, com um campo de 7 bits, o maior valor diretamente codificável é:
-
-```text
-127 × 100 ms = 12,7 s
-```
-
-### Observação de implementação
-
-No código atual existe a constante:
-
-```c
-#define MAX_WAIT_TICKS 600
-```
-
-Porém, `OP1` possui apenas 7 bits e é armazenado em `uint8_t`. Para manter a ISA coerente com o formato de 18 bits, o limite efetivo de `WAIT` deve ser ajustado para **127** ou o formato da ISA precisa ser alterado. Para a arquitetura documentada neste arquivo, considera-se `0..127` como a faixa representável.
+| Comando | Descrição|
+| --- | --- |
+| `LOAD` | Reseta todo o sistema, limpa a memória, zera registradores e estatísticas SECDED e abre modo de carga. |
+| `END` | Valida as instruções, verifica integridade SECDED da carga, destinos de saltos e fecha a montagem. |
+| `RUN` | Prepara o sistema para o modo de execução passo a passo a partir de `0x00`. |
+| `STEP` ou `*` | Executa um único ciclo de instrução (Busca → Decodifica → Executa). |
+| `AUTO` | Executa o programa continuamente em alta velocidade. |
+| `STOP` | Interrompe imediatamente qualquer execução ou temporização, desligando bombas e alarmes. |
+| `STATUS` | Exibe estado completo da CPU, registradores, atuadores, sensores e telemetria detalhada de SECDED (síndrome, paridade global e contadores SEC/DED). |
+| `MEM [ini fim]` | Despeja a memória exibindo o endereço, a **palavra física de 24 bits (SECDED)**, os **18 bits decodificados da ISA** e o diagnóstico de integridade individual da palavra. |
+| `FLIP <end> <bit>` | **Injetor de falhas:** inverte o bit físico especificado (`0..23`) no endereço indicado (`0x00..0x7F`) para demonstrar o funcionamento prático da correção SEC ou parada por DED. |
 
 ---
 
-# 8. Conjunto de instruções
+## 8. Exemplo Prático de Injeção de Falha e Diagnóstico
 
-## `READ x`
-
-Lê o potenciômetro associado à bomba `x`, converte a entrada analógica para um percentual entre 0% e 100%, armazena o valor em `NIVEL[x]` e em `ACC` e marca a leitura como válida.
-
-## `ON x`
-
-Liga a saída correspondente à bomba `x`.
-
-## `OFF x`
-
-Desliga a saída correspondente à bomba `x`.
-
-## `ALARM x`
-
-Ativa o estado de manutenção corretiva da bomba `x` e mantém o buzzer ativo enquanto existir pelo menos um alarme corretivo ativo.
-
-## `LED x`
-
-Liga o LED de manutenção preventiva da bomba `x`.
-
-## `INFO x`
-
-Realiza nova leitura do nível da bomba `x`, atualiza `NIVEL[x]` e `ACC` e apresenta no display a faixa correspondente ao percentual.
-
-## `SILENCE x`
-
-Desativa o alarme corretivo da bomba `x`. O buzzer somente é desligado quando não existir outro alarme corretivo ativo.
-
-## `LEDOFF x`
-
-Desliga o LED de manutenção preventiva da bomba `x`.
-
-## `CMP x,n`
-
-Compara o último nível válido da bomba `x` com o percentual `n` sem realizar nova leitura:
-
+1. O montador grava uma instrução na memória:
 ```text
-ACC = NIVEL[x] - n
+Montado em 0x00 | ISA[18b]=000000000010000000 | SECDED[24b]=000000001000010100000100
+
 ```
 
-Os flags são definidos a partir do resultado.
 
-`CMP` é a única instrução que altera os indicadores de comparação.
-
-## `JMP a`
-
-Desvio incondicional para o endereço `a`.
-
-## `JL a`
-
-Desvia para `a` quando `FLAG_L` estiver ativo.
-
-## `JE a`
-
-Desvia para `a` quando `FLAG_Z` estiver ativo.
-
-## `JG a`
-
-Desvia para `a` quando `FLAG_G` estiver ativo.
-
-## `WAIT t`
-
-Suspende temporariamente a execução durante `t × 100 ms`, sem bloquear o monitor serial.
-
-## `HALT`
-
-Finaliza a execução do programa e mantém o estado das saídas.
-
----
-
-# 9. Montagem da instrução
-
-O processo de montagem ocorre somente durante a fase de carga.
-
+2. O usuário injeta uma falha de bit simples na RAM via monitor serial:
 ```text
-Linha Assembly
-      ↓
-Remoção de comentário
-      ↓
-Separação dos tokens
-      ↓
-Identificação do mnemônico
-      ↓
-Validação dos operandos
-      ↓
-Codificação do opcode
-      ↓
-Codificação dos operandos
-      ↓
-Palavra de 18 bits
-      ↓
-MBR
-      ↓
-MEMORIA(MEM_ESCRITA)
+FLIP 0x00 10
+
 ```
 
-O caractere `;` inicia um comentário. Tudo depois dele é descartado antes da montagem.
 
-Exemplo:
-
-```asm
-READ 1 ; lê o reservatório 1
-```
-
-é montado da mesma maneira que:
-
-```asm
-READ 1
-```
-
-Linhas vazias e linhas compostas somente por comentários não ocupam posições da memória.
-
-A memória só é modificada depois que a instrução inteira foi validada. Dessa forma, uma linha inválida não deixa uma instrução parcialmente gravada.
-
----
-
-# 10. Ciclo de busca, decodificação e execução
-
-A execução segue o modelo:
-
-### 10.1 Busca
-
+3. O comando inverte o bit físico 10 e acusa a falha esperada:
 ```text
-PC → MAR
+FLIP aplicado em 0x00 no bit fisico 10 | SECDED[24b]=... | Diagnostico esperado: SEC (1 Erro Corrigido) (S=10, P0=1)
+
 ```
 
-A UC coloca no `MAR` o endereço indicado pelo `PC` e solicita uma leitura:
 
+4. Durante a busca (`UC` / `STEP`), a memória intercepta:
 ```text
-MEMORIA(MEM_LEITURA)
+[SECDED-SEC] 1 bit invertido detectado e corrigido em 0x00 | Bit fisico corrigido (Sindrome)=10 | P_total=1
+
 ```
 
-A memória retorna a palavra em:
 
+A palavra é automaticamente corrigida em tempo de execução (*scrubbing*), a execução da ISA prossegue sem falhas e o contador `CONTADOR_SEC` é incrementado.
+
+
+5. Caso o usuário injete um segundo erro no mesmo endereço com outro `FLIP`, a leitura do ciclo seguinte detecta:
 ```text
-MBR
+[SECDED-DED] ERRO DUPLO INrecuperavel em 0x00 | Sindrome=... | P_total=0
+ERRO DE EXECUCAO: SECDED detectou ERRO DUPLO (DED) na memoria de programa
+
 ```
 
-### 10.2 Transferência para IR
 
-```text
-MBR → IR
-```
-
-O `IR` recebe a palavra binária completa de 18 bits.
-
-### 10.3 Decodificação
-
-O Decoder separa:
-
-```text
-IR[17..14] → opcode
-IR[13..7]  → OP1
-IR[6..0]   → OP2
-```
-
-### 10.4 Execução
-
-A UC utiliza o opcode para selecionar a operação correspondente.
-
-Exemplo para `CMP`:
-
-```text
-IR
- ↓
-DECODER
- ↓
-OP1 = bomba
-OP2 = limite
- ↓
-UC
- ↓
-NIVEL[OP1]
- ↓
-ULA
- ↓
-ACC + FLAGS
-```
-
-### 10.5 Atualização do PC
-
-Após a execução, o `PC` é incrementado para a próxima posição quando a instrução não realizar um desvio.
-
-Nas instruções `JMP`, `JL`, `JE` e `JG`, o `PC` pode receber diretamente o endereço do destino.
-
----
-
-# 11. Estados de execução
-
-A UC possui os seguintes modos:
-
-```text
-CARGA
-PARADO
-STEP
-AUTO
-WAIT
-HALT
-ERRO
-```
-
-### CARGA
-
-Recebe e monta instruções Assembly.
-
-### PARADO
-
-Programa carregado, mas sem execução ativa.
-
-### STEP
-
-Executa uma instrução somente após o comando `STEP` ou `*`.
-
-### AUTO
-
-Executa continuamente as instruções armazenadas.
-
-### WAIT
-
-A execução está temporariamente suspensa. O monitor serial continua sendo atendido.
-
-### HALT
-
-O programa terminou normalmente pela instrução `HALT`.
-
-### ERRO
-
-A execução foi interrompida devido a uma condição inválida, como opcode desconhecido, acesso a posição não carregada, `CMP` sem leitura válida ou desvio condicional sem comparação válida.
-
----
-
-# 12. Comandos do monitor serial
-
-Os comandos do ambiente não fazem parte da ISA e não ocupam posições da memória de programa.
-
-| Comando | Função |
-|---|---|
-| `LOAD` | Limpa programa, memória, registradores e saídas e inicia nova carga |
-| `END` | Finaliza a carga e valida os destinos dos desvios |
-| `RUN` | Inicia execução passo a passo a partir de `0x00` |
-| `STEP` | Executa uma instrução no modo passo a passo |
-| `*` | Sinônimo de `STEP` |
-| `AUTO` | Executa o programa continuamente a partir de `0x00` |
-| `STOP` | Interrompe a execução/espera e desliga bombas e alarmes |
-| `MEM` | Exibe todas as posições da memória |
-| `MEM 0x00 0x0F` | Exibe um intervalo da memória |
-| `STATUS` | Exibe registradores, flags, modo, níveis e saídas |
-
----
-
-# 13. Ocupação da memória
-
-A memória possui 128 posições, portanto o maior programa possível possui 128 instruções carregadas, desde que todas as posições sejam utilizadas.
-
-Exemplo:
-
-```text
-0x00 → primeira instrução
-0x01 → segunda instrução
-0x02 → terceira instrução
-...
-0x7F → 128ª instrução
-```
-
-A posição `0x80` não existe na arquitetura.
-
-Quando todas as 128 posições estiverem ocupadas, uma nova instrução deve ser rejeitada.
-
-A variável:
-
-```c
-instrucao_atual
-```
-
-atua como ponteiro de carga. O valor `128` representa memória cheia no controle interno do programa.
-
----
-
-# 14. Tratamento de erros
-
-O projeto prevê erros tanto durante a montagem quanto durante a execução.
-
-### Erros de montagem
-
-- mnemônico inexistente;
-- bomba fora de `1..3`;
-- percentual fora de `0..100`;
-- endereço sem `0x` ou fora de `0x00..0x7F`;
-- quantidade incorreta de operandos;
-- operandos extras;
-- memória cheia.
-
-Uma instrução rejeitada não deve alterar a memória nem avançar o ponteiro de carga.
-
-### Erros de execução
-
-- opcode inválido;
-- campos incompatíveis com a ISA;
-- tentativa de executar posição não carregada;
-- `CMP` sem leitura válida;
-- desvio condicional sem comparação válida;
-- destino de desvio não carregado;
-- término da memória sem `HALT` ou desvio válido.
-
-Quando ocorre um erro de execução, o sistema entra em `MODO_ERRO` e desliga bombas e alarmes.
-
----
-
-# 15. Representação do `ACC` em complemento de 2
-
-Embora o `ACC` seja utilizado internamente como valor assinado, sua representação arquitetural pode ser exibida em 18 bits.
-
-Para uma diferença negativa, os 18 bits seguem a representação em complemento de 2.
-
-Exemplo:
-
-```text
-20 - 30 = -10
-```
-
-O valor decimal exibido é:
-
-```text
-ACC = -10
-```
-
-e sua representação binária pode ser apresentada com 18 bits.
-
-Os 18 bits do ACC são independentes dos 18 bits da palavra de instrução: no caso do `ACC`, os bits representam um **valor assinado**; no caso da memória, representam **opcode + operandos**.
-
----
-
-# 16. Relação entre Assembly, memória e execução
-
-O projeto foi estruturado para que a sequência de processamento seja:
-
-```text
-                MONTAGEM
-                   │
-                   ▼
-          ┌─────────────────┐
-          │  TEXTO ASSEMBLY │
-          └────────┬────────┘
-                   │
-                   ▼
-              ASSEMBLER
-                   │
-                   ▼
-          ┌─────────────────┐
-          │ PALAVRA 18 BITS │
-          └────────┬────────┘
-                   │
-                   ▼
-              MEM_PROG
-                   │
-                   ▼
-              ┌────────┐
-              │   PC   │
-              └────┬───┘
-                   │
-                   ▼
-              ┌────────┐
-              │  MAR   │
-              └────┬───┘
-                   │
-                   ▼
-              ┌────────┐
-              │ MEMÓRIA│
-              └────┬───┘
-                   │
-                   ▼
-              ┌────────┐
-              │  MBR   │
-              └────┬───┘
-                   │
-                   ▼
-              ┌────────┐
-              │   IR   │
-              └────┬───┘
-                   │
-                   ▼
-              ┌─────────┐
-              │ DECODER │
-              └────┬────┘
-                   │
-                   ▼
-              ┌─────────┐
-              │   UC    │
-              └────┬────┘
-                   │
-          ┌────────┼────────┐
-          ▼        ▼        ▼
-         ULA       E/S      PC
-          │        │
-          ▼        ▼
-        ACC/     Bombas /
-        FLAGS    Alarmes /
-                 Display
-```
-
-O Assembly é utilizado para **montar** o programa, mas não para determinar diretamente a operação durante a execução. Durante a execução, a fonte de informação da CPU é a palavra armazenada em `MEM_PROG`.
-
----
-
-# 17. Decisões arquiteturais principais
-
-| Decisão | Justificativa |
-|---|---|
-| Palavra de 18 bits | É exatamente `4 + 7 + 7`, cobrindo opcode, dois operandos e o formato `CMP` |
-| Opcode de 4 bits | Representa até 16 códigos; 15 são utilizados e 1 fica reservado para inválido |
-| Operandos de 7 bits | Permitem representar 128 valores, coincidindo com o espaço de endereçamento |
-| Memória de 128 posições | Corresponde diretamente aos 7 bits de endereço e ao intervalo `0x00..0x7F` |
-| Uma instrução por posição | Mantém o tamanho fixo e simplifica busca e execução |
-| `uint32_t` para palavra armazenada | Facilita as operações de deslocamento e máscara; somente 18 bits têm significado arquitetural |
-| `MEM_OCUPADA` separado | Evita confundir uma palavra zerada com uma posição que não foi carregada |
-| `IR` com a palavra inteira | Permite que a decodificação seja feita diretamente sobre a instrução armazenada |
-| `ACC` assinado | Necessário para representar diferenças negativas em `CMP` |
-| ULA separada da UC | Mantém a distinção entre cálculo e controle |
-| `WAIT` não bloqueante | Permite continuar atendendo o monitor serial durante a espera |
-
----
-
-# 18. Resumo quantitativo da arquitetura
-
-```text
-ISA
-├── 15 instruções válidas
-├── 4 bits de opcode
-├── 7 bits de operando 1
-└── 7 bits de operando 2
-
-PALAVRA
-└── 18 bits
-
-MEMÓRIA
-├── 7 bits de endereço
-├── 128 posições
-├── 0x00 .. 0x7F
-├── 18 bits por posição
-├── 2304 bits de capacidade lógica
-└── 288 bytes de capacidade lógica
-
-IMPLEMENTAÇÃO DE MEM_PROG
-├── 128 elementos
-├── uint32_t por elemento
-└── 512 bytes de armazenamento do array
-
-REGISTRADORES PRINCIPAIS
-├── PC
-├── MAR
-├── MBR
-├── IR
-├── ACC
-├── OP1 / OP2
-└── FLAGS
-```
-
----
-
-# 19. Exemplo de codificação
-
-Considere:
-
-```asm
-CMP 1, 30
-```
-
-O opcode de `CMP` é:
-
-```text
-1000
-```
-
-A bomba `1` em 7 bits é:
-
-```text
-0000001
-```
-
-O percentual `30` em 7 bits é:
-
-```text
-0011110
-```
-
-Logo, a palavra é:
-
-```text
-1000 0000001 0011110
-```
-
-Total:
-
-```text
-4 + 7 + 7 = 18 bits
-```
-
-Outro exemplo:
-
-```asm
-JMP 0x2A
-```
-
-O destino hexadecimal `0x2A` corresponde a decimal `42`, que em 7 bits é:
-
-```text
-0101010
-```
-
-Logo:
-
-```text
-1001 0101010 0000000
-```
-
----
-
-# 20. Conclusão
-
-A arquitetura foi organizada para representar, de forma explícita, os principais conceitos de um computador clássico: **memória de programa, registradores, unidade de controle, unidade lógica e aritmética, decodificação de instruções e ciclo de busca/execução**.
-
-A escolha de **18 bits por palavra** é sustentada pela estrutura da ISA:
-
-```text
-4 bits de opcode + 7 bits + 7 bits = 18 bits
-```
-
-Os **7 bits de endereço** permitem exatamente **128 posições de memória**, de `0x00` a `0x7F`. Como cada posição possui uma palavra de 18 bits, a capacidade lógica da memória é:
-
-```text
-128 × 18 = 2304 bits = 288 bytes
-```
-
-A implementação utiliza `uint32_t` para armazenar cada palavra por praticidade, mas os 14 bits restantes não fazem parte da memória arquitetural. A separação entre conteúdo (`MEM_PROG`) e ocupação (`MEM_OCUPADA`) também permite detectar corretamente posições não carregadas.
-
-O resultado é uma máquina virtual simples, de palavra fixa, com espaço de endereçamento definido, ISA própria e ciclo de instrução explícito, adequada à proposta do trabalho de aplicar os conceitos fundamentais de Arquitetura de Computadores.
-
----
-
-Autor: Brenno Marques (@brennoms)
-
-
+O processador paralisa imediatamente a máquina e desliga os atuadores, prevenindo falhas no processo físico.
