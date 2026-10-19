@@ -47,10 +47,18 @@
 
 #define LINE_BUFFER_SIZE   96
 
+// Limiares de nível para os LEDs RGB
+#define LIMIAR_CRITICO     20
+#define LIMIAR_RAZOAVEL    70
+
 // ================================ Pinagem ===================================
 const uint8_t PIN_NIVEL[3] = {A0, A1, A2};
 const uint8_t PIN_BOMBA[3] = {30, 31, 32};
-const uint8_t PIN_LED_PREVENTIVO[3] = {33, 34, 35};
+
+// Pinos dos 3 LEDs RGB (Cátodo Comum)
+const uint8_t PIN_RGB_R[3] = {33, 36, 38}; // substituir pelos pinos corretos
+const uint8_t PIN_RGB_G[3] = {34, 37, 39}; // substituir pelos pinos corretos
+
 const uint8_t PIN_BUZZER = 45;
 const uint8_t PIN_DISPLAY[7] = {22, 23, 24, 25, 26, 27, 28}; // a,b,c,d,e,f,g
 
@@ -130,6 +138,13 @@ enum FaseUC : uint8_t {
     FASE_EXECUTA
 };
 
+enum CorRGB : uint8_t {
+    RGB_OFF = 0,
+    RGB_VERMELHO,
+    RGB_AMARELO,
+    RGB_VERDE
+};
+
 // ============================= Registradores =================================
 uint8_t  PC = 0;                       // 7 bits efetivos
 uint8_t  MAR = 0;                      // endereço de memória
@@ -158,7 +173,7 @@ bool FLAG_G = false;
 bool COMPARACAO_VALIDA = false;
 
 bool BOMBA_LIGADA[3] = {false, false, false};
-bool LED_PREVENTIVO[3] = {false, false, false};
+bool LED_HABILITADO[3] = {false, false, false};
 bool ALARME_CORRETIVO[3] = {false, false, false};
 
 // ================================ Memória ===================================
@@ -321,21 +336,18 @@ const char *nomeModoAtual() {
 }
 
 // ============================ Módulo SECDED =================================
-// Codifica 18 bits da ISA em uma palavra física de 24 bits (Hamming Estendido 24,18)
 uint32_t codificarSECDED(uint32_t dados18) {
     dados18 &= MASCARA_PALAVRA;
     uint32_t codificado = 0;
 
-    // 1) Posiciona os 18 bits de dados nos índices que não são potências de 2
     for (uint8_t i = 0; i < BITS_PALAVRA; ++i) {
         if ((dados18 >> i) & 1UL) {
             codificado |= (1UL << POS_DADOS_HAMMING[i]);
         }
     }
 
-    // 2) Calcula os 5 bits de paridade de Hamming (P1, P2, P4, P8, P16)
     for (uint8_t k = 0; k < 5; ++k) {
-        uint8_t posParidade = (1U << k); // 1, 2, 4, 8, 16
+        uint8_t posParidade = (1U << k);
         uint8_t paridade = 0;
 
         for (uint8_t pos = 1; pos <= 23; ++pos) {
@@ -349,20 +361,18 @@ uint32_t codificarSECDED(uint32_t dados18) {
         }
     }
 
-    // 3) Calcula o bit de paridade global P0 (posição 0) sobre os bits 1..23
     uint8_t paridadeGlobal = 0;
     for (uint8_t pos = 1; pos <= 23; ++pos) {
         paridadeGlobal ^= (uint8_t)((codificado >> pos) & 1UL);
     }
 
     if (paridadeGlobal) {
-        codificado |= 1UL; // bit 0
+        codificado |= 1UL;
     }
 
     return codificado & MASCARA_FISICA;
 }
 
-// Extrai os 18 bits de dados de uma palavra física de 24 bits
 uint32_t extrairDados18(uint32_t palavraFisica24) {
     uint32_t dados18 = 0;
     for (uint8_t i = 0; i < BITS_PALAVRA; ++i) {
@@ -373,13 +383,9 @@ uint32_t extrairDados18(uint32_t palavraFisica24) {
     return dados18 & MASCARA_PALAVRA;
 }
 
-// Decodifica e verifica a integridade de uma palavra de 24 bits via SECDED.
-// Se houver erro simples (SEC), corrige a palavraFisica Corrigida e extrai os 18 bits.
-// Se houver erro duplo (DED), retorna ECC_DED_ERRO_DUPLO.
 StatusSECDED decodificarSECDED(uint32_t palavraRecebida, uint32_t *palavraFisicaCorrigida, uint32_t *dados18Saida, uint8_t *sindromeSaida, uint8_t *paridadeGlobalSaida) {
     palavraRecebida &= MASCARA_FISICA;
 
-    // 1) Calcula o vetor de síndrome S (5 bits)
     uint8_t sindrome = 0;
     for (uint8_t k = 0; k < 5; ++k) {
         uint8_t posParidade = (1U << k);
@@ -396,7 +402,6 @@ StatusSECDED decodificarSECDED(uint32_t palavraRecebida, uint32_t *palavraFisica
         }
     }
 
-    // 2) Calcula a paridade global P_total sobre todos os 24 bits (0..23)
     uint8_t paridadeTotal = 0;
     for (uint8_t pos = 0; pos < BITS_FISICOS; ++pos) {
         paridadeTotal ^= (uint8_t)((palavraRecebida >> pos) & 1UL);
@@ -409,14 +414,9 @@ StatusSECDED decodificarSECDED(uint32_t palavraRecebida, uint32_t *palavraFisica
     StatusSECDED status = ECC_OK;
 
     if (sindrome == 0 && paridadeTotal == 0) {
-        // Sem erro
         status = ECC_OK;
     }
     else if (paridadeTotal == 1) {
-        // Erro simples (SEC):
-        // - Se sindrome == 0, o bit flip ocorreu no próprio bit P0 (bit 0).
-        // - Se sindrome != 0 (1..23), o bit flip ocorreu na posição indicada pela síndrome.
-        // - Se sindrome > 23, múltiplos erros ímpares extrapolam o código, tratando como erro crítico.
         if (sindrome > 23) {
             status = ECC_DED_ERRO_DUPLO;
         } else {
@@ -425,7 +425,6 @@ StatusSECDED decodificarSECDED(uint32_t palavraRecebida, uint32_t *palavraFisica
         }
     }
     else {
-        // sindrome != 0 e paridadeTotal == 0 -> Erro Duplo Detectado (DED)
         status = ECC_DED_ERRO_DUPLO;
     }
 
@@ -435,7 +434,53 @@ StatusSECDED decodificarSECDED(uint32_t palavraRecebida, uint32_t *palavraFisica
     return status;
 }
 
-// =============================== E/S =========================================
+// =============================== E/S e RGB ===================================
+void definirCorRGB(uint8_t indiceBomba, CorRGB cor) {
+    if (indiceBomba >= 3) return;
+
+    switch (cor) {
+        case RGB_VERMELHO: // Vermelho para nível crítico
+            digitalWrite(PIN_RGB_R[indiceBomba], HIGH);
+            digitalWrite(PIN_RGB_G[indiceBomba], LOW);
+            break;
+
+        case RGB_AMARELO:  // Amarelo (R + G) para nível razoável
+            digitalWrite(PIN_RGB_R[indiceBomba], HIGH);
+            digitalWrite(PIN_RGB_G[indiceBomba], HIGH);
+            break;
+
+        case RGB_VERDE:    // Verde para nível cheio
+            digitalWrite(PIN_RGB_R[indiceBomba], LOW);
+            digitalWrite(PIN_RGB_G[indiceBomba], HIGH);
+            break;
+
+        case RGB_OFF:
+        default:
+            digitalWrite(PIN_RGB_R[indiceBomba], LOW);
+            digitalWrite(PIN_RGB_G[indiceBomba], LOW);
+            break;
+    }
+}
+
+void atualizarLEDNivel(uint8_t indiceBomba) {
+    if (indiceBomba >= 3) return;
+
+    if (!LED_HABILITADO[indiceBomba] || !NIVEL_VALIDO[indiceBomba]) {
+        definirCorRGB(indiceBomba, RGB_OFF);
+        return;
+    }
+
+    uint8_t percentual = NIVEL[indiceBomba];
+
+    if (percentual <= LIMIAR_CRITICO) {
+        definirCorRGB(indiceBomba, RGB_VERMELHO);
+    } else if (percentual <= LIMIAR_RAZOAVEL) {
+        definirCorRGB(indiceBomba, RGB_AMARELO);
+    } else {
+        definirCorRGB(indiceBomba, RGB_VERDE);
+    }
+}
+
 void atualizarBuzzer() {
     bool algumAlarme = false;
     for (uint8_t i = 0; i < 3; ++i) {
@@ -451,11 +496,11 @@ void atualizarBuzzer() {
 void desligarBombasEAlarmes() {
     for (uint8_t i = 0; i < 3; ++i) {
         BOMBA_LIGADA[i] = false;
-        LED_PREVENTIVO[i] = false;
+        LED_HABILITADO[i] = false;
         ALARME_CORRETIVO[i] = false;
 
         digitalWrite(PIN_BOMBA[i], LOW);
-        digitalWrite(PIN_LED_PREVENTIVO[i], LOW);
+        definirCorRGB(i, RGB_OFF);
     }
 
     digitalWrite(PIN_BUZZER, LOW);
@@ -521,6 +566,9 @@ int lerPercentualAnalogico(uint8_t indiceBomba) {
     NIVEL_VALIDO[indiceBomba] = true;
     ACC = (int16_t)percentual;
 
+    // Atualiza a cor se o LED deste reservatório estiver ligado
+    atualizarLEDNivel(indiceBomba);
+
     return percentual;
 }
 
@@ -540,11 +588,6 @@ void lerNivelEExibir(uint8_t indiceBomba) {
 }
 
 // =============================== MEMORIA ====================================
-// A interface de memória aplica SECDED automaticamente:
-// - Escrita: codifica os 18 bits de MBR em 24 bits (SECDED) e grava em MEM_PROG[MAR].
-// - Leitura: lê os 24 bits de MEM_PROG[MAR], verifica Síndrome e Paridade Global,
-//   corrige automaticamente se houver erro de 1 bit (fazendo scrubbing em MEM_PROG)
-//   ou sinaliza falha se detectar erro de 2 bits (DED).
 bool MEMORIA(SinalMemoria sinal) {
     if (MAR >= TAM_MEMORIA) {
         return false;
@@ -568,7 +611,6 @@ bool MEMORIA(SinalMemoria sinal) {
             MBR = dados18 & MASCARA_PALAVRA;
 
             if (ECC_STATUS == ECC_SEC_CORRIGIDO) {
-                // Memory Scrubbing: regrava o bit corrigido na memória física
                 MEM_PROG[MAR] = palavraCorrigida;
                 CONTADOR_SEC++;
 
@@ -1024,8 +1066,9 @@ void executarALARM(uint8_t bomba) {
 void executarLED(uint8_t bomba) {
     if (!validarBombaOperando(bomba)) return;
 
-    LED_PREVENTIVO[bomba - 1] = true;
-    digitalWrite(PIN_LED_PREVENTIVO[bomba - 1], HIGH);
+    uint8_t idx = bomba - 1;
+    LED_HABILITADO[idx] = true;
+    atualizarLEDNivel(idx);
     avancarPC();
 }
 
@@ -1047,8 +1090,9 @@ void executarSILENCE(uint8_t bomba) {
 void executarLEDOFF(uint8_t bomba) {
     if (!validarBombaOperando(bomba)) return;
 
-    LED_PREVENTIVO[bomba - 1] = false;
-    digitalWrite(PIN_LED_PREVENTIVO[bomba - 1], LOW);
+    uint8_t idx = bomba - 1;
+    LED_HABILITADO[idx] = false;
+    definirCorRGB(idx, RGB_OFF);
     avancarPC();
 }
 
@@ -1162,9 +1206,17 @@ void imprimirEstadosSaida() {
         Serial.print(BOMBA_LIGADA[i] ? '1' : '0');
         if (i < 2) Serial.print(',');
     }
-    Serial.print(F("] PREV=["));
+    Serial.print(F("] LED_RGB=["));
     for (uint8_t i = 0; i < 3; ++i) {
-        Serial.print(LED_PREVENTIVO[i] ? '1' : '0');
+        if (!LED_HABILITADO[i]) {
+            Serial.print(F("OFF"));
+        } else if (NIVEL[i] <= LIMIAR_CRITICO) {
+            Serial.print(F("RED"));
+        } else if (NIVEL[i] <= LIMIAR_RAZOAVEL) {
+            Serial.print(F("YEL"));
+        } else {
+            Serial.print(F("GRN"));
+        }
         if (i < 2) Serial.print(',');
     }
     Serial.print(F("] ALARM=["));
@@ -1387,7 +1439,6 @@ void comandoMEM(char *comando) {
     }
 }
 
-// Comando FLIP <endereco> <bit_fisico 0..23> para injetar falhas na memória e testar SECDED
 void comandoFLIP(char *comando) {
     char copia[LINE_BUFFER_SIZE];
     strncpy(copia, comando, sizeof(copia) - 1);
@@ -1538,8 +1589,16 @@ void comandoSTATUS() {
         Serial.print(NIVEL_VALIDO[i] ? 1 : 0);
         Serial.print(F(" bomba="));
         Serial.print(BOMBA_LIGADA[i] ? 1 : 0);
-        Serial.print(F(" LED_prev="));
-        Serial.print(LED_PREVENTIVO[i] ? 1 : 0);
+        Serial.print(F(" LED_RGB="));
+        if (!LED_HABILITADO[i]) {
+            Serial.print(F("OFF"));
+        } else if (NIVEL[i] <= LIMIAR_CRITICO) {
+            Serial.print(F("VERMELHO"));
+        } else if (NIVEL[i] <= LIMIAR_RAZOAVEL) {
+            Serial.print(F("AMARELO"));
+        } else {
+            Serial.print(F("VERDE"));
+        }
         Serial.print(F(" alarm="));
         Serial.println(ALARME_CORRETIVO[i] ? 1 : 0);
     }
@@ -1752,8 +1811,9 @@ void setup() {
 
     for (uint8_t i = 0; i < 3; ++i) {
         pinMode(PIN_BOMBA[i], OUTPUT);
-        pinMode(PIN_LED_PREVENTIVO[i], OUTPUT);
         pinMode(PIN_NIVEL[i], INPUT);
+        pinMode(PIN_RGB_R[i], OUTPUT);
+        pinMode(PIN_RGB_G[i], OUTPUT);
     }
 
     pinMode(PIN_BUZZER, OUTPUT);
