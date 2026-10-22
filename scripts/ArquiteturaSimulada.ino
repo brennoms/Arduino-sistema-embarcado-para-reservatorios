@@ -53,14 +53,14 @@
 
 // ================================ Pinagem ===================================
 const uint8_t PIN_NIVEL[3] = {A0, A1, A2};
-const uint8_t PIN_BOMBA[3] = {30, 31, 32};
+const uint8_t PIN_BOMBA[3] = {31, 33, 35};
 
 // Pinos dos 3 LEDs RGB (Cátodo Comum)
-const uint8_t PIN_RGB_R[3] = {33, 36, 38}; // substituir pelos pinos corretos
-const uint8_t PIN_RGB_G[3] = {34, 37, 39}; // substituir pelos pinos corretos
+const uint8_t PIN_RGB_R[3] = {36, 40, 46}; // substituir pelos pinos corretos
+const uint8_t PIN_RGB_G[3] = {37, 41, 47}; // substituir pelos pinos corretos
 
-const uint8_t PIN_BUZZER = 45;
-const uint8_t PIN_DISPLAY[7] = {22, 23, 24, 25, 26, 27, 28}; // a,b,c,d,e,f,g
+const uint8_t PIN_BUZZER = 42;
+const uint8_t PIN_DISPLAY[7] = {26, 25, 24, 23, 22, 27, 28}; // a,b,c,d,e,f,g
 
 #define DISPLAY_ACTIVE_HIGH true
 
