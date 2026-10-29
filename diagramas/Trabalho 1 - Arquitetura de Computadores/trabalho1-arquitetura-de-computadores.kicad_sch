@@ -6,8 +6,8 @@
 	(paper "A4")
 	(title_block
 		(title "Sistema programável de três bombas - Arduino Mega 2560")
-		(date "2026-10-23")
-		(rev "6.0")
+		(date "2026-10-29")
+		(rev "7.0")
 		(company "Arquitetura de Computadores - IBMEC")
 		(comment 1 "Autora: Manuela Barros Menezes da Silva")
 	)
@@ -1866,7 +1866,7 @@
 			)
 			(embedded_fonts no)
 		)
-		(symbol "Device:LED_RGBK"
+		(symbol "Device:LED_RKGB"
 			(pin_names
 				(offset 0)
 				(hide yes)
@@ -1886,7 +1886,7 @@
 					)
 				)
 			)
-			(property "Value" "LED_RGBK"
+			(property "Value" "LED_RKGB"
 				(at 0 -8.89 0)
 				(show_name no)
 				(do_not_autoplace no)
@@ -1918,7 +1918,7 @@
 					)
 				)
 			)
-			(property "Description" "RGB LED, red/green/blue/cathode"
+			(property "Description" "RGB LED, red/cathode/green/blue"
 				(at 0 0 0)
 				(show_name no)
 				(do_not_autoplace no)
@@ -1951,7 +1951,7 @@
 					)
 				)
 			)
-			(symbol "LED_RGBK_0_0"
+			(symbol "LED_RKGB_0_0"
 				(text "R"
 					(at 1.905 3.81 0)
 					(effects
@@ -1977,7 +1977,7 @@
 					)
 				)
 			)
-			(symbol "LED_RGBK_0_1"
+			(symbol "LED_RKGB_0_1"
 				(circle
 					(center -2.032 0)
 					(radius 0.254)
@@ -2309,7 +2309,7 @@
 					)
 				)
 			)
-			(symbol "LED_RGBK_1_1"
+			(symbol "LED_RKGB_1_1"
 				(pin passive line
 					(at 5.08 5.08 180)
 					(length 2.54)
@@ -2329,9 +2329,9 @@
 					)
 				)
 				(pin passive line
-					(at 5.08 0 180)
+					(at -5.08 0 0)
 					(length 2.54)
-					(name "GA"
+					(name "K"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -2347,9 +2347,9 @@
 					)
 				)
 				(pin passive line
-					(at 5.08 -5.08 180)
+					(at 5.08 0 180)
 					(length 2.54)
-					(name "BA"
+					(name "GA"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -2365,9 +2365,9 @@
 					)
 				)
 				(pin passive line
-					(at -5.08 0 0)
+					(at 5.08 -5.08 180)
 					(length 2.54)
-					(name "K"
+					(name "BA"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -3052,7 +3052,7 @@
 			)
 			(embedded_fonts no)
 		)
-		(symbol "Transistor_BJT:BC547"
+		(symbol "Transistor_BJT:PN2222A"
 			(pin_names
 				(offset 0)
 				(hide yes)
@@ -3073,7 +3073,7 @@
 					(justify left)
 				)
 			)
-			(property "Value" "BC547"
+			(property "Value" "PN2222A"
 				(at 5.08 0 0)
 				(show_name no)
 				(do_not_autoplace no)
@@ -3097,7 +3097,7 @@
 					(justify left)
 				)
 			)
-			(property "Datasheet" "https://www.onsemi.com/pub/Collateral/BC550-D.pdf"
+			(property "Datasheet" "https://www.onsemi.com/pub/Collateral/PN2222-D.PDF"
 				(at 0 0 0)
 				(show_name no)
 				(do_not_autoplace no)
@@ -3109,7 +3109,7 @@
 					(justify left)
 				)
 			)
-			(property "Description" "0.1A Ic, 45V Vce, Small Signal NPN Transistor, TO-92"
+			(property "Description" "1A Ic, 40V Vce, NPN Transistor, General Purpose Transistor, TO-92"
 				(at 0 0 0)
 				(show_name no)
 				(do_not_autoplace no)
@@ -3131,7 +3131,7 @@
 					)
 				)
 			)
-			(property "Sim.Pins" "1=C 2=B 3=E"
+			(property "Sim.Pins" "1=E 2=B 3=C"
 				(at 0 0 0)
 				(show_name no)
 				(do_not_autoplace no)
@@ -3164,7 +3164,7 @@
 					)
 				)
 			)
-			(symbol "BC547_0_1"
+			(symbol "PN2222A_0_1"
 				(polyline
 					(pts
 						(xy -2.54 0) (xy 0.635 0)
@@ -3201,7 +3201,7 @@
 					)
 				)
 			)
-			(symbol "BC547_1_1"
+			(symbol "PN2222A_1_1"
 				(polyline
 					(pts
 						(xy 0.635 0.635) (xy 2.54 2.54)
@@ -3239,9 +3239,9 @@
 					)
 				)
 				(pin passive line
-					(at 2.54 5.08 270)
+					(at 2.54 -5.08 90)
 					(length 2.54)
-					(name "C"
+					(name "E"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -3275,9 +3275,9 @@
 					)
 				)
 				(pin passive line
-					(at 2.54 -5.08 90)
+					(at 2.54 5.08 270)
 					(length 2.54)
-					(name "E"
+					(name "C"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -4318,7 +4318,7 @@
 	)
 	(wire
 		(pts
-			(xy 208.28 130.81) (xy 218.44 130.81)
+			(xy 210.82 132.08) (xy 220.98 132.08)
 		)
 		(stroke
 			(width 0)
@@ -4478,6 +4478,16 @@
 	)
 	(wire
 		(pts
+			(xy 228.6 132.08) (xy 232.41 132.08)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "1fb19e8c-40a0-4994-8bf7-060df2eecd24")
+	)
+	(wire
+		(pts
 			(xy 124.46 60.96) (xy 124.46 71.12)
 		)
 		(stroke
@@ -4615,16 +4625,6 @@
 			(type default)
 		)
 		(uuid "28a3f2dd-b5e2-4fef-ac0f-885a491778c3")
-	)
-	(wire
-		(pts
-			(xy 236.22 135.89) (xy 236.22 138.43)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "2909e24c-ee7a-4906-840e-1f1210e4f56d")
 	)
 	(wire
 		(pts
@@ -4838,6 +4838,16 @@
 	)
 	(wire
 		(pts
+			(xy 240.03 123.19) (xy 240.03 127)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "46fc2199-ea14-4168-9d88-900452db8c04")
+	)
+	(wire
+		(pts
 			(xy 243.84 52.07) (xy 248.92 52.07)
 		)
 		(stroke
@@ -4985,16 +4995,6 @@
 			(type default)
 		)
 		(uuid "6a2346b1-62d0-4a32-b04b-734f22ec3f8b")
-	)
-	(wire
-		(pts
-			(xy 236.22 125.73) (xy 243.84 125.73)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "6c5b99c6-94e9-42ae-8ae0-29207a15d2d6")
 	)
 	(wire
 		(pts
@@ -5228,6 +5228,16 @@
 	)
 	(wire
 		(pts
+			(xy 240.03 137.16) (xy 240.03 140.97)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "a0951d4a-5992-40d0-ab72-cb34c8fd8860")
+	)
+	(wire
+		(pts
 			(xy 55.88 106.68) (xy 55.88 124.46)
 		)
 		(stroke
@@ -5435,16 +5445,6 @@
 			(type default)
 		)
 		(uuid "b74b48a2-3924-4b2b-b347-937475d88909")
-	)
-	(wire
-		(pts
-			(xy 226.06 130.81) (xy 228.6 130.81)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "ba08c986-9199-4690-8ac2-c24d840223a7")
 	)
 	(wire
 		(pts
@@ -5977,7 +5977,7 @@
 		(uuid "5766137c-b6e5-4634-b7ff-307b20a91154")
 	)
 	(label "52_BZ1"
-		(at 208.28 130.81 0)
+		(at 210.82 132.08 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -6896,7 +6896,7 @@
 	)
 	(symbol
 		(lib_id "power:+5V")
-		(at 243.84 120.65 90)
+		(at 240.03 118.11 90)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -6907,7 +6907,7 @@
 		(fields_autoplaced yes)
 		(uuid "01cf4a23-a8ba-40b0-b1ac-6bb915145901")
 		(property "Reference" "#PWR08"
-			(at 247.65 120.65 0)
+			(at 243.84 118.11 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6918,7 +6918,7 @@
 			)
 		)
 		(property "Value" "+5V"
-			(at 240.03 120.6499 90)
+			(at 236.22 118.1099 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -6929,7 +6929,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 243.84 120.65 0)
+			(at 240.03 118.11 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6940,7 +6940,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 243.84 120.65 0)
+			(at 240.03 118.11 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6951,7 +6951,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"+5V\""
-			(at 243.84 120.65 0)
+			(at 240.03 118.11 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -7564,6 +7564,116 @@
 		)
 	)
 	(symbol
+		(lib_id "Transistor_BJT:PN2222A")
+		(at 237.49 132.08 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "255f38dd-904a-48de-b72d-a3898603d20e")
+		(property "Reference" "TR1"
+			(at 242.57 130.8099 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "2N2222A"
+			(at 242.57 133.3499 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Package_TO_SOT_THT:TO-92_Inline"
+			(at 242.57 133.985 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+					(italic yes)
+				)
+				(justify left)
+			)
+		)
+		(property "Datasheet" "https://www.onsemi.com/pub/Collateral/PN2222-D.PDF"
+			(at 237.49 132.08 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Description" "1A Ic, 40V Vce, NPN Transistor, General Purpose Transistor, TO-92"
+			(at 237.49 132.08 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Sim.Device" "NPN"
+			(at 237.49 132.08 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Sim.Pins" "1=E 2=B 3=C"
+			(at 237.49 132.08 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "c485c300-94f3-4fc2-a5a9-3a47e6108030")
+		)
+		(pin "2"
+			(uuid "4e08ae2a-e874-48be-839d-4adc12407079")
+		)
+		(pin "3"
+			(uuid "a3ed7da8-2538-463f-b7c6-687aca70448f")
+		)
+		(instances
+			(project "trabalho1-arquitetura-de-computadores"
+				(path "/e63e39d7-6ac0-4ffd-8aa3-1841a4541b55"
+					(reference "TR1")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Device:R")
 		(at 118.11 128.27 0)
 		(unit 1)
@@ -7764,6 +7874,95 @@
 		)
 	)
 	(symbol
+		(lib_id "Device:LED_RKGB")
+		(at 38.1 140.97 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "398e62b9-14bb-42b3-9f7f-ade46e4cbf95")
+		(property "Reference" "RGB1"
+			(at 48.26 139.6999 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(face "KiCad Font")
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Value" "Bomba 1"
+			(at 48.26 142.2399 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Footprint" "Package_TO_SOT_THT:TO-92_Inline"
+			(at 39.37 140.97 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 39.37 140.97 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "RGB LED, red/cathode/green/blue"
+			(at 38.1 140.97 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "3"
+			(uuid "05349919-678a-496f-ad60-babae9a65c08")
+		)
+		(pin "1"
+			(uuid "19a989c2-eab7-4583-adc0-5f0954b8a127")
+		)
+		(pin "4"
+			(uuid "15eec651-e3b7-499f-9995-da9468d02a8b")
+		)
+		(pin "2"
+			(uuid "6e577607-2156-470a-9cb2-203089069d4c")
+		)
+		(instances
+			(project "trabalho1-arquitetura-de-computadores"
+				(path "/e63e39d7-6ac0-4ffd-8aa3-1841a4541b55"
+					(reference "RGB1")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Device:R")
 		(at 176.53 52.07 90)
 		(unit 1)
@@ -7924,7 +8123,7 @@
 		)
 	)
 	(symbol
-		(lib_id "Device:LED_RGBK")
+		(lib_id "Device:LED_RKGB")
 		(at 96.52 140.97 90)
 		(unit 1)
 		(body_style 1)
@@ -7934,9 +8133,9 @@
 		(in_pos_files yes)
 		(dnp no)
 		(fields_autoplaced yes)
-		(uuid "567b0e88-91b3-440d-b07e-caa42a2ca840")
+		(uuid "5c75852b-1b20-4bae-a8ca-232306ac5df6")
 		(property "Reference" "RGB3"
-			(at 105.41 139.6999 90)
+			(at 106.68 139.6999 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -7947,7 +8146,7 @@
 			)
 		)
 		(property "Value" "Bomba 3"
-			(at 105.41 142.2399 90)
+			(at 106.68 142.2399 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -7979,7 +8178,7 @@
 				)
 			)
 		)
-		(property "Description" "RGB LED, red/green/blue/cathode"
+		(property "Description" "RGB LED, red/cathode/green/blue"
 			(at 96.52 140.97 0)
 			(hide yes)
 			(show_name no)
@@ -7990,17 +8189,17 @@
 				)
 			)
 		)
-		(pin "3"
-			(uuid "79f8c0b4-edd3-45b2-b1c0-1327678332ed")
-		)
-		(pin "2"
-			(uuid "74a2e40c-21ab-4190-8c60-717897f62342")
+		(pin "4"
+			(uuid "f5a627f2-ea14-43ea-b344-58b862ed86e2")
 		)
 		(pin "1"
-			(uuid "428bedbe-0555-4949-bafc-ae1f06545174")
+			(uuid "b657bca8-0860-4388-bf97-18540ebd993c")
 		)
-		(pin "4"
-			(uuid "c854245c-3dfd-4cf5-b3d3-cf6082034437")
+		(pin "2"
+			(uuid "dd4d1b38-8530-4744-bed1-5db83bf13e4c")
+		)
+		(pin "3"
+			(uuid "d7ecb764-1e9d-47d2-a5bc-7daabe763e9d")
 		)
 		(instances
 			(project "trabalho1-arquitetura-de-computadores"
@@ -9395,94 +9594,6 @@
 		)
 	)
 	(symbol
-		(lib_id "Device:LED_RGBK")
-		(at 38.1 140.97 90)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "b6f705c1-3e61-47ab-af13-7c80dea9f664")
-		(property "Reference" "RGB1"
-			(at 46.99 139.6999 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-			)
-		)
-		(property "Value" "Bomba 1"
-			(at 46.99 142.2399 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-			)
-		)
-		(property "Footprint" "LED_SMD:LED_Cree-XHP50_3V_HighDensity"
-			(at 39.37 140.97 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 39.37 140.97 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "RGB LED, red/green/blue/cathode"
-			(at 38.1 140.97 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "4"
-			(uuid "2766b319-c2c9-4d65-9b55-61a87ed04ae9")
-		)
-		(pin "2"
-			(uuid "adf1c8c0-9ee8-4e5a-addc-a05d8dae3753")
-		)
-		(pin "3"
-			(uuid "42dab6fa-ed0d-447f-b011-078337293e23")
-		)
-		(pin "1"
-			(uuid "83bb62d6-9795-4080-ab3c-9475cf41a150")
-		)
-		(instances
-			(project "trabalho1-arquitetura-de-computadores"
-				(path "/e63e39d7-6ac0-4ffd-8aa3-1841a4541b55"
-					(reference "RGB1")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "power:GND")
 		(at 96.52 156.21 0)
 		(unit 1)
@@ -9804,7 +9915,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 236.22 138.43 0)
+		(at 240.03 140.97 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -9815,7 +9926,7 @@
 		(fields_autoplaced yes)
 		(uuid "c47c6227-cd25-4e82-83fa-69693b1fc6fd")
 		(property "Reference" "#PWR03"
-			(at 236.22 144.78 0)
+			(at 240.03 147.32 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9826,7 +9937,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 236.22 143.51 0)
+			(at 240.03 146.05 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -9836,7 +9947,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 236.22 138.43 0)
+			(at 240.03 140.97 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9847,7 +9958,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 236.22 138.43 0)
+			(at 240.03 140.97 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9858,7 +9969,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 236.22 138.43 0)
+			(at 240.03 140.97 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9955,6 +10066,94 @@
 			(project "trabalho1-arquitetura-de-computadores"
 				(path "/e63e39d7-6ac0-4ffd-8aa3-1841a4541b55"
 					(reference "R1")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:LED_RKGB")
+		(at 67.31 140.97 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "d60bff21-6de3-43e4-b655-cb01f88f419e")
+		(property "Reference" "RGB2"
+			(at 77.47 139.6999 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Value" "Bomba 2"
+			(at 77.47 142.2399 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Footprint" ""
+			(at 68.58 140.97 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 68.58 140.97 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "RGB LED, red/cathode/green/blue"
+			(at 67.31 140.97 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "3"
+			(uuid "4ef2a6aa-5124-4516-b66d-68ad0163d0da")
+		)
+		(pin "4"
+			(uuid "52dec0b7-058d-4a7e-9b2f-87d4a07db279")
+		)
+		(pin "2"
+			(uuid "ef922e1e-b2bf-4929-8b45-b91974f3132f")
+		)
+		(pin "1"
+			(uuid "baa6d138-e167-4c9f-b0d8-6c4aca500568")
+		)
+		(instances
+			(project "trabalho1-arquitetura-de-computadores"
+				(path "/e63e39d7-6ac0-4ffd-8aa3-1841a4541b55"
+					(reference "RGB2")
 					(unit 1)
 				)
 			)
@@ -10144,94 +10343,6 @@
 		)
 	)
 	(symbol
-		(lib_id "Device:LED_RGBK")
-		(at 67.31 140.97 90)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "e490ed45-206a-41ca-9767-a5fd248dcc51")
-		(property "Reference" "RGB2"
-			(at 76.2 139.6999 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-			)
-		)
-		(property "Value" "Bomba 2"
-			(at 76.2 142.2399 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-			)
-		)
-		(property "Footprint" ""
-			(at 68.58 140.97 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 68.58 140.97 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "RGB LED, red/green/blue/cathode"
-			(at 67.31 140.97 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "f4923b8a-084c-4389-8777-705c46fbc396")
-		)
-		(pin "3"
-			(uuid "bfa8f0ea-ecb3-4d46-bbfd-f2a15f8639f2")
-		)
-		(pin "2"
-			(uuid "c6c8ac15-2f70-48fa-aa33-b62838222979")
-		)
-		(pin "4"
-			(uuid "c59fad9c-16a1-491f-99b7-5320db6f71bd")
-		)
-		(instances
-			(project "trabalho1-arquitetura-de-computadores"
-				(path "/e63e39d7-6ac0-4ffd-8aa3-1841a4541b55"
-					(reference "RGB2")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "Device:R")
 		(at 38.1 128.27 0)
 		(unit 1)
@@ -10408,7 +10519,7 @@
 	)
 	(symbol
 		(lib_id "Device:Buzzer")
-		(at 246.38 123.19 0)
+		(at 242.57 120.65 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -10419,7 +10530,7 @@
 		(fields_autoplaced yes)
 		(uuid "f597c36e-e04f-4e43-a4f3-19424984240b")
 		(property "Reference" "BZ1"
-			(at 250.19 121.9199 0)
+			(at 246.38 119.3799 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -10430,7 +10541,7 @@
 			)
 		)
 		(property "Value" "Buzzer 1"
-			(at 250.19 124.4599 0)
+			(at 246.38 121.9199 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -10441,7 +10552,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 245.745 120.65 90)
+			(at 241.935 118.11 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10452,7 +10563,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 245.745 120.65 90)
+			(at 241.935 118.11 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10463,7 +10574,7 @@
 			)
 		)
 		(property "Description" "Buzzer, polarized"
-			(at 246.38 123.19 0)
+			(at 242.57 120.65 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10490,7 +10601,7 @@
 	)
 	(symbol
 		(lib_id "Device:R")
-		(at 222.25 130.81 270)
+		(at 224.79 132.08 270)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -10501,7 +10612,7 @@
 		(fields_autoplaced yes)
 		(uuid "f66bca56-4e6a-434f-84d8-f2e08e61ca79")
 		(property "Reference" "R24"
-			(at 222.25 124.46 90)
+			(at 224.79 125.73 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -10511,7 +10622,7 @@
 			)
 		)
 		(property "Value" "330Ω"
-			(at 222.25 127 90)
+			(at 224.79 128.27 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -10521,7 +10632,7 @@
 			)
 		)
 		(property "Footprint" "Package_TO_SOT_THT:TO-92_Inline"
-			(at 222.25 129.032 90)
+			(at 224.79 130.302 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10532,7 +10643,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 222.25 130.81 0)
+			(at 224.79 132.08 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10543,7 +10654,7 @@
 			)
 		)
 		(property "Description" "Resistor"
-			(at 222.25 130.81 0)
+			(at 224.79 132.08 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10563,116 +10674,6 @@
 			(project "trabalho1-arquitetura-de-computadores"
 				(path "/e63e39d7-6ac0-4ffd-8aa3-1841a4541b55"
 					(reference "R24")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Transistor_BJT:BC547")
-		(at 233.68 130.81 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "fa397005-be79-41e1-9072-a7a81adfce22")
-		(property "Reference" "Q1"
-			(at 238.76 129.5399 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "BC547"
-			(at 238.76 132.0799 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" "Package_TO_SOT_THT:TO-92_Inline"
-			(at 238.76 132.715 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-					(italic yes)
-				)
-				(justify left)
-			)
-		)
-		(property "Datasheet" "https://www.onsemi.com/pub/Collateral/BC550-D.pdf"
-			(at 233.68 130.81 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Description" "0.1A Ic, 45V Vce, Small Signal NPN Transistor, TO-92"
-			(at 233.68 130.81 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Sim.Device" "NPN"
-			(at 233.68 130.81 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Sim.Pins" "1=C 2=B 3=E"
-			(at 233.68 130.81 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "c2eec632-30d2-4bc5-8a17-99ce351d1243")
-		)
-		(pin "3"
-			(uuid "b4280f93-7f35-436f-a7b2-184cfe5417a2")
-		)
-		(pin "2"
-			(uuid "45247744-a0b5-4c4c-ab5a-23443dc39c64")
-		)
-		(instances
-			(project "trabalho1-arquitetura-de-computadores"
-				(path "/e63e39d7-6ac0-4ffd-8aa3-1841a4541b55"
-					(reference "Q1")
 					(unit 1)
 				)
 			)
