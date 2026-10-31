@@ -53,16 +53,18 @@
 
 // ================================ Pinagem ===================================
 const uint8_t PIN_NIVEL[3] = {A0, A1, A2};
-const uint8_t PIN_BOMBA[3] = {31, 33, 35};
+const uint8_t PIN_BOMBA[3] = {46, 47, 48};
 
-// Pinos dos 3 LEDs RGB (Cátodo Comum)
-const uint8_t PIN_RGB_R[3] = {36, 40, 46}; // substituir pelos pinos corretos
-const uint8_t PIN_RGB_G[3] = {37, 41, 47}; // substituir pelos pinos corretos
+// Pinos dos 3 LEDs RGB (canais vermelho e verde)
+const uint8_t PIN_RGB_R[3] = {38, 40, 42};
+const uint8_t PIN_RGB_G[3] = {39, 41, 43};
 
-const uint8_t PIN_BUZZER = 42;
-const uint8_t PIN_DISPLAY[7] = {26, 25, 24, 23, 22, 27, 28}; // a,b,c,d,e,f,g
+const uint8_t PIN_BUZZER = 52;
+const uint8_t PIN_DISPLAY_DEZENAS[7] = {22, 23, 24, 25, 26, 27, 28}; // DISP1: a,b,c,d,e,f,g
+const uint8_t PIN_DISPLAY_UNIDADES[7] = {29, 30, 31, 32, 33, 34, 35}; // DISP2: a,b,c,d,e,f,g
 
-#define DISPLAY_ACTIVE_HIGH true
+// Os displays HS-5101BS do esquema têm anodo comum.
+#define DISPLAY_ACTIVE_HIGH false
 
 // ============================= Códigos da ISA ===============================
 enum Opcode : uint8_t {
@@ -192,7 +194,8 @@ bool CLOCK = false;
 uint32_t waitTermino = 0;
 ModoExecucao modoAposWait = MODO_PARADO;
 bool stepSolicitado = false;
-uint8_t ultimoDigito = 0;
+uint8_t ultimoPercentual = 0;
+bool displayAtivo = false;
 
 char linhaSerial[LINE_BUFFER_SIZE];
 uint8_t posLinhaSerial = 0;
@@ -506,18 +509,6 @@ void desligarBombasEAlarmes() {
     digitalWrite(PIN_BUZZER, LOW);
 }
 
-uint8_t faixaDisplay(uint8_t percentual) {
-    if (percentual <= 10) return 1;
-    if (percentual <= 20) return 2;
-    if (percentual <= 30) return 3;
-    if (percentual <= 40) return 4;
-    if (percentual <= 50) return 5;
-    if (percentual <= 60) return 6;
-    if (percentual <= 70) return 7;
-    if (percentual <= 90) return 8;
-    return 9;
-}
-
 const bool SEGMENTOS[10][7] = {
     {1,1,1,1,1,1,0}, // 0
     {0,1,1,0,0,0,0}, // 1
@@ -531,26 +522,33 @@ const bool SEGMENTOS[10][7] = {
     {1,1,1,1,0,1,1}  // 9
 };
 
-void apagarDisplay() {
-    for (uint8_t i = 0; i < 7; ++i) {
-        digitalWrite(PIN_DISPLAY[i], DISPLAY_ACTIVE_HIGH ? LOW : HIGH);
-    }
-    ultimoDigito = 0;
-}
-
-void mostrarDigito(uint8_t digito) {
-    if (digito > 9) {
-        apagarDisplay();
-        return;
-    }
+void escreverDigitoDisplay(const uint8_t pinos[7], uint8_t digito) {
+    if (digito > 9) digito = 0;
 
     for (uint8_t i = 0; i < 7; ++i) {
         bool ligado = SEGMENTOS[digito][i];
         if (!DISPLAY_ACTIVE_HIGH) ligado = !ligado;
-        digitalWrite(PIN_DISPLAY[i], ligado ? HIGH : LOW);
+        digitalWrite(pinos[i], ligado ? HIGH : LOW);
     }
+}
 
-    ultimoDigito = digito;
+void apagarDisplay() {
+    for (uint8_t i = 0; i < 7; ++i) {
+        digitalWrite(PIN_DISPLAY_DEZENAS[i], DISPLAY_ACTIVE_HIGH ? LOW : HIGH);
+        digitalWrite(PIN_DISPLAY_UNIDADES[i], DISPLAY_ACTIVE_HIGH ? LOW : HIGH);
+    }
+    ultimoPercentual = 0;
+    displayAtivo = false;
+}
+
+void mostrarPercentual(uint8_t percentual) {
+    if (percentual > 99) percentual = 99;
+
+    escreverDigitoDisplay(PIN_DISPLAY_DEZENAS, percentual / 10);
+    escreverDigitoDisplay(PIN_DISPLAY_UNIDADES, percentual % 10);
+
+    ultimoPercentual = percentual;
+    displayAtivo = true;
 }
 
 int lerPercentualAnalogico(uint8_t indiceBomba) {
@@ -576,15 +574,16 @@ void lerNivelEExibir(uint8_t indiceBomba) {
     int percentual = lerPercentualAnalogico(indiceBomba);
     if (percentual < 0) return;
 
-    uint8_t digito = faixaDisplay((uint8_t)percentual);
-    mostrarDigito(digito);
+    uint8_t percentualDisplay = percentual > 99 ? 99 : (uint8_t)percentual;
+    mostrarPercentual(percentualDisplay);
 
     Serial.print(F("INFO bomba "));
     Serial.print(indiceBomba + 1);
     Serial.print(F(" -> "));
     Serial.print(percentual);
-    Serial.print(F("% | faixa/display="));
-    Serial.println(digito);
+    Serial.print(F("% | display="));
+    Serial.print(percentualDisplay);
+    Serial.println(F("%"));
 }
 
 // =============================== MEMORIA ====================================
@@ -1611,8 +1610,12 @@ void comandoSTATUS() {
     Serial.println(buzzerAtivo ? 1 : 0);
 
     Serial.print(F("Display="));
-    if (ultimoDigito == 0) Serial.println(F("apagado"));
-    else Serial.println(ultimoDigito);
+    if (!displayAtivo) {
+        Serial.println(F("apagado"));
+    } else {
+        Serial.print(ultimoPercentual);
+        Serial.println(F("%"));
+    }
 
     Serial.println(F("=========================================="));
 }
@@ -1819,7 +1822,8 @@ void setup() {
     pinMode(PIN_BUZZER, OUTPUT);
 
     for (uint8_t i = 0; i < 7; ++i) {
-        pinMode(PIN_DISPLAY[i], OUTPUT);
+        pinMode(PIN_DISPLAY_DEZENAS[i], OUTPUT);
+        pinMode(PIN_DISPLAY_UNIDADES[i], OUTPUT);
     }
 
     desligarBombasEAlarmes();

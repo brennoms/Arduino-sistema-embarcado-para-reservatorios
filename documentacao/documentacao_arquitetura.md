@@ -4,7 +4,7 @@
 
 Este projeto implementa, sobre um **Arduino Mega 2560**, uma arquitetura de computador simulada para monitoramento e controle de três reservatórios industriais.
 
-A aplicação física utiliza três potenciômetros como entradas analógicas (níveis dos reservatórios), três atuadores de bomba, alarme sonoro (buzzer), um display de 7 segmentos para telemetria numérica e **três LEDs RGB (cátodo comum)** para monitoramento contínuo do nível volumétrico dos tanques. O programa que controla o sistema é escrito em uma **ISA própria**, montado e carregado via monitor serial.
+A aplicação física utiliza três potenciômetros como entradas analógicas (níveis dos reservatórios), três atuadores de bomba, alarme sonoro (buzzer), dois displays de 7 segmentos para telemetria numérica de 00% a 99% e **três LEDs RGB** para monitoramento contínuo do nível volumétrico dos tanques. O programa que controla o sistema é escrito em uma **ISA própria**, montado e carregado via monitor serial.
 
 Para garantir alta confiabilidade e tolerância a falhas na memória simulada, foi incorporado um controlador de código de correção de erros com tecnologia **SECDED (*Single Error Correction, Double Error Detection*)** baseado no código de Hamming Estendido (24,18).
 
@@ -206,9 +206,9 @@ $$128 \times 32 \text{ bits} = 512 \text{ bytes}$$
 
 ---
 
-## 6. Subsistema de Telemetria Visual (LEDs RGB)
+## 6. Subsistema de Telemetria Visual (LEDs RGB e displays)
 
-O monitoramento visual analógico conta com **três LEDs RGB (Cátodo Comum)** independentes, um para cada reservatório. Cada LED utiliza os canais Vermelho (**R**) e Verde (**G**) para exibir três estados contínuos de volumetria:
+O monitoramento visual analógico conta com **três LEDs RGB** independentes, um para cada reservatório. Cada LED utiliza os canais Vermelho (**R**) e Verde (**G**) para exibir três estados contínuos de volumetria:
 
 | Faixa de Volume | Cor Exibida | Canal R | Canal G | Significado Operacional |
 | --- | --- | --- | --- | --- |
@@ -218,6 +218,8 @@ O monitoramento visual analógico conta com **três LEDs RGB (Cátodo Comum)** i
 | Desabilitado / Desligado | **Apagado** | `LOW` | `LOW` | Monitoramento visual do tanque inativo. |
 
 * **Atualização em Tempo Real:** Uma vez habilitado o indicador de um reservatório (`LED_HABILITADO[x - 1] = true`), qualquer leitura analógica realizada (`READ x` ou `INFO x`) recalcula e atualiza instantaneamente a cor do LED RGB correspondente.
+* **Pinagem do hardware:** potenciômetros em `A0`, `A1` e `A2`; bombas em `46`, `47` e `48`; canais RGB vermelho/verde em `{38,40,42}` e `{39,41,43}`; buzzer em `52`.
+* **Displays:** o display de dezenas usa os segmentos `a..g` nos pinos `{22,23,24,25,26,27,28}` e o display de unidades nos pinos `{29,30,31,32,33,34,35}`. Os displays são de ânodo comum e, por isso, os segmentos são acionados em nível baixo. A instrução `INFO x` mostra o percentual inteiro de `00` a `99`; leituras de `100%` são limitadas a `99` no display.
 
 ---
 
@@ -232,7 +234,7 @@ A ISA possui formato fixo de 18 bits (`OPCODE [4] | OP1 [7] | OP2 [7]`):
 | `OFF x` | `0010` | Bomba (1..3) | `0000000` | Desliga a bomba `x`. |
 | `ALARM x` | `0011` | Bomba (1..3) | `0000000` | Ativa alarme corretivo da bomba `x` e aciona buzzer. |
 | `LED x` | `0100` | Reservatório (1..3) | `0000000` | Habilita o monitoramento contínuo por LED RGB do reservatório `x`, acendendo na cor do nível atual. |
-| `INFO x` | `0101` | Reservatório (1..3) | `0000000` | Lê nível analógico, atualiza LED RGB, exibe faixa (1..9) no display de 7 segmentos e salva em `ACC`. |
+| `INFO x` | `0101` | Reservatório (1..3) | `0000000` | Lê nível analógico, atualiza LED RGB, exibe o percentual de `00` a `99` nos dois displays e salva em `ACC`. |
 | `SILENCE x` | `0110` | Bomba (1..3) | `0000000` | Desativa alarme corretivo da bomba `x`. |
 | `LEDOFF x` | `0111` | Reservatório (1..3) | `0000000` | Desabilita o monitoramento visual do reservatório `x` e apaga seu LED RGB. |
 | `CMP x,n` | `1000` | Reservatório (1..3) | Limite (0..100) | Calcula `NIVEL[x] - n` via ULA e atualiza `ACC` e flags `L`, `Z`, `G`. |
