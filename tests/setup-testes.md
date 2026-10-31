@@ -120,13 +120,13 @@ STEP
 
 
 * **Passo 2 (`STEP` em `0x01` - `ON 1`):**
-* `IR` decodifica `OPCODE=1` (`ON`), `OP1=1`; pino 30 vai para nível alto (`HIGH`); próximo `PC = 0x02`.
+* `IR` decodifica `OPCODE=1` (`ON`), `OP1=1`; pino 46 vai para nível alto (`HIGH`); próximo `PC = 0x02`.
 
 
 
 
 * **Passo 3 (`STEP` em `0x02` - `OFF 1`):**
-* `IR` decodifica `OPCODE=2` (`OFF`), `OP1=1`; pino 30 volta para nível baixo (`LOW`); próximo `PC = 0x03`.
+* `IR` decodifica `OPCODE=2` (`OFF`), `OP1=1`; pino 46 volta para nível baixo (`LOW`); próximo `PC = 0x03`.
 
 
 
@@ -297,7 +297,7 @@ RUN
 
 * **Roteiro de Validação Física:**
 1. Executar passo a passo até acionar `ON 1..3` e `LED 1..3`:
-* Os pinos das bombas (30, 31, 32) vão a nível alto sequencialmente.
+* Os pinos das bombas (46, 47, 48) vão a nível alto sequencialmente.
 
 
 * Os LEDs RGB 1, 2 e 3 acendem na cor correspondente ao nível de cada tanque (Vermelho, Amarelo ou Verde).
@@ -306,7 +306,7 @@ RUN
 
 
 2. Executar `ALARM 1` seguido de `ALARM 2`:
-* O buzzer no pino 45 é ativado com `ALARM 1`.
+* O buzzer no pino 52 é ativado com `ALARM 1`.
 
 
 * Com `ALARM 2`, o buzzer permanece soando continuamente.
@@ -321,7 +321,7 @@ RUN
 
 
 4. Executar `SILENCE 2`:
-* Não restando alarmes pendentes no sistema, a função `atualizarBuzzer()` **desliga o buzzer** (pino 45 vai para `LOW`).
+* Não restando alarmes pendentes no sistema, a função `atualizarBuzzer()` **desliga o buzzer** (pino 52 vai para `LOW`).
 
 
 
@@ -334,7 +334,7 @@ RUN
 
 ---
 
-## 4.6 Display de 7 Segmentos e Telemetria
+## 4.6 Displays de 7 Segmentos e Telemetria
 
 * **Entrada (Monitor Serial):**
 
@@ -350,28 +350,25 @@ RUN
 
 ```
 
-* **Verificação das Faixas (Display e Serial):**
-A instrução `INFO x` mapeia os níveis para os segmentos (pinos 22 a 28):
+* **Verificação dos dois dígitos (Display e Serial):**
+A instrução `INFO x` mostra o percentual inteiro em dois displays de ânodo comum:
+* Dezenas: segmentos `a..g` nos pinos `22, 23, 24, 25, 26, 27, 28` (`DISP1`).
+* Unidades: segmentos `a..g` nos pinos `29, 30, 31, 32, 33, 34, 35` (`DISP2`).
+* Para ânodo comum, um segmento aceso deve estar em `LOW` e um segmento apagado em `HIGH`.
 
-
-
-| Nível (%) | Faixa Teórica | Dígito Esperado no Display | Retorno Serial (`INFO`) |
+| Nível (%) | Display de dezenas | Display de unidades | Retorno Serial (`INFO`) |
 | --- | --- | --- | --- |
-| **0% a 10%** | Faixa 1 | `1` | `INFO bomba x -> N% | faixa/display=1`<br> |
-| **11% a 20%** | Faixa 2 | `2` | `INFO bomba x -> N% | faixa/display=2`<br> |
-| **21% a 30%** | Faixa 3 | `3` | `INFO bomba x -> N% | faixa/display=3`<br> |
-| **31% a 40%** | Faixa 4 | `4` | `INFO bomba x -> N% | faixa/display=4`<br> |
-| **41% a 50%** | Faixa 5 | `5` | `INFO bomba x -> N% | faixa/display=5`<br> |
-| **51% a 60%** | Faixa 6 | `6` | `INFO bomba x -> N% | faixa/display=6`<br> |
-| **61% a 70%** | Faixa 7 | `7` | `INFO bomba x -> N% | faixa/display=7`<br> |
-| **71% a 90%** | Faixa 8 | `8` | `INFO bomba x -> N% | faixa/display=8`<br> |
-| **91% a 100%** | Faixa 9 | `9` | `INFO bomba x -> N% | faixa/display=9`<br> |
+| **0%** | `0` | `0` | `INFO bomba x -> 0% | display=0%` |
+| **7%** | `0` | `7` | `INFO bomba x -> 7% | display=7%` |
+| **42%** | `4` | `2` | `INFO bomba x -> 42% | display=42%` |
+| **99%** | `9` | `9` | `INFO bomba x -> 99% | display=99%` |
+| **100%** | `9` | `9` | `INFO bomba x -> 100% | display=99%` |
 
 * **Procedimento de Teste de Transição:**
-* Ajustar o potenciômetro em torno das fronteiras críticas (ex: transição entre 10% e 11%, 70% e 71%, 90% e 91%).
+* Ajustar o potenciômetro para aproximadamente `0%`, `7%`, `42%`, `99%` e `100%`.
 
 
-* Executar `STEP` e confirmar a mudança imediata do dígito no display físico e no log do terminal serial.
+* Executar `STEP` após cada ajuste e confirmar os dois dígitos no display físico e o valor exibido no log do terminal serial.
 
 
 
