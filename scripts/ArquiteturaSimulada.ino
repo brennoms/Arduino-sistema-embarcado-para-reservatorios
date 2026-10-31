@@ -522,14 +522,20 @@ const bool SEGMENTOS[10][7] = {
     {1,1,1,1,0,1,1}  // 9
 };
 
-void escreverDigitoDisplay(const uint8_t pinos[7], uint8_t digito) {
-    if (digito > 9) digito = 0;
+const bool SEGMENTOS_LETRA_L[7] = {0, 0, 0, 1, 1, 1, 0};
 
+void escreverSegmentosDisplay(const uint8_t pinos[7], const bool segmentos[7]) {
     for (uint8_t i = 0; i < 7; ++i) {
-        bool ligado = SEGMENTOS[digito][i];
+        bool ligado = segmentos[i];
         if (!DISPLAY_ACTIVE_HIGH) ligado = !ligado;
         digitalWrite(pinos[i], ligado ? HIGH : LOW);
     }
+}
+
+void escreverDigitoDisplay(const uint8_t pinos[7], uint8_t digito) {
+    if (digito > 9) digito = 0;
+
+    escreverSegmentosDisplay(pinos, SEGMENTOS[digito]);
 }
 
 void apagarDisplay() {
@@ -549,6 +555,11 @@ void mostrarPercentual(uint8_t percentual) {
 
     ultimoPercentual = percentual;
     displayAtivo = true;
+}
+
+void mostrarIdentificacaoReservatorio(uint8_t reservatorio) {
+    escreverSegmentosDisplay(PIN_DISPLAY_DEZENAS, SEGMENTOS_LETRA_L);
+    escreverDigitoDisplay(PIN_DISPLAY_UNIDADES, reservatorio);
 }
 
 int lerPercentualAnalogico(uint8_t indiceBomba) {
@@ -573,6 +584,9 @@ int lerPercentualAnalogico(uint8_t indiceBomba) {
 void lerNivelEExibir(uint8_t indiceBomba) {
     int percentual = lerPercentualAnalogico(indiceBomba);
     if (percentual < 0) return;
+
+    mostrarIdentificacaoReservatorio(indiceBomba + 1);
+    delay(1000);
 
     uint8_t percentualDisplay = percentual > 99 ? 99 : (uint8_t)percentual;
     mostrarPercentual(percentualDisplay);

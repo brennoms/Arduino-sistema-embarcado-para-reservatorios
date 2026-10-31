@@ -351,7 +351,9 @@ RUN
 ```
 
 * **Verificação dos dois dígitos (Display e Serial):**
-A instrução `INFO x` mostra o percentual inteiro em dois displays de ânodo comum:
+A instrução `INFO x` primeiro mostra a identificação do reservatório por 1 segundo e depois mostra o percentual inteiro:
+* Identificação: `L` no display de dezenas e o número do reservatório no display de unidades (`L1`, `L2` ou `L3`). O nível é lido no início da instrução, antes da exibição da identificação.
+* O percentual é mantido nos dois displays de ânodo comum após a identificação:
 * Dezenas: segmentos `a..g` nos pinos `22, 23, 24, 25, 26, 27, 28` (`DISP1`).
 * Unidades: segmentos `a..g` nos pinos `29, 30, 31, 32, 33, 34, 35` (`DISP2`).
 * Para ânodo comum, um segmento aceso deve estar em `LOW` e um segmento apagado em `HIGH`.
@@ -368,7 +370,7 @@ A instrução `INFO x` mostra o percentual inteiro em dois displays de ânodo co
 * Ajustar o potenciômetro para aproximadamente `0%`, `7%`, `42%`, `99%` e `100%`.
 
 
-* Executar `STEP` após cada ajuste e confirmar os dois dígitos no display físico e o valor exibido no log do terminal serial.
+* Executar `STEP` após cada ajuste e confirmar `Lx` por 1 segundo, seguido pelos dois dígitos do percentual no display físico e pelo valor exibido no log do terminal serial.
 
 
 

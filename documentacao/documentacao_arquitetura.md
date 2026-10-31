@@ -219,7 +219,7 @@ O monitoramento visual analógico conta com **três LEDs RGB** independentes, um
 
 * **Atualização em Tempo Real:** Uma vez habilitado o indicador de um reservatório (`LED_HABILITADO[x - 1] = true`), qualquer leitura analógica realizada (`READ x` ou `INFO x`) recalcula e atualiza instantaneamente a cor do LED RGB correspondente.
 * **Pinagem do hardware:** potenciômetros em `A0`, `A1` e `A2`; bombas em `46`, `47` e `48`; canais RGB vermelho/verde em `{38,40,42}` e `{39,41,43}`; buzzer em `52`.
-* **Displays:** o display de dezenas usa os segmentos `a..g` nos pinos `{22,23,24,25,26,27,28}` e o display de unidades nos pinos `{29,30,31,32,33,34,35}`. Os displays são de ânodo comum e, por isso, os segmentos são acionados em nível baixo. A instrução `INFO x` mostra o percentual inteiro de `00` a `99`; leituras de `100%` são limitadas a `99` no display.
+* **Displays:** o display de dezenas usa os segmentos `a..g` nos pinos `{22,23,24,25,26,27,28}` e o display de unidades nos pinos `{29,30,31,32,33,34,35}`. Os displays são de ânodo comum e, por isso, os segmentos são acionados em nível baixo. A instrução `INFO x` mostra `Lx` por 1 segundo (`L` no display de dezenas e o identificador no display de unidades) e depois mostra o percentual inteiro de `00` a `99`; leituras de `100%` são limitadas a `99` no display.
 
 ---
 
@@ -234,7 +234,7 @@ A ISA possui formato fixo de 18 bits (`OPCODE [4] | OP1 [7] | OP2 [7]`):
 | `OFF x` | `0010` | Bomba (1..3) | `0000000` | Desliga a bomba `x`. |
 | `ALARM x` | `0011` | Bomba (1..3) | `0000000` | Ativa alarme corretivo da bomba `x` e aciona buzzer. |
 | `LED x` | `0100` | Reservatório (1..3) | `0000000` | Habilita o monitoramento contínuo por LED RGB do reservatório `x`, acendendo na cor do nível atual. |
-| `INFO x` | `0101` | Reservatório (1..3) | `0000000` | Lê nível analógico, atualiza LED RGB, exibe o percentual de `00` a `99` nos dois displays e salva em `ACC`. |
+| `INFO x` | `0101` | Reservatório (1..3) | `0000000` | Lê nível analógico, atualiza LED RGB, exibe `Lx` por 1 segundo e depois o percentual de `00` a `99` nos dois displays; salva em `ACC`. |
 | `SILENCE x` | `0110` | Bomba (1..3) | `0000000` | Desativa alarme corretivo da bomba `x`. |
 | `LEDOFF x` | `0111` | Reservatório (1..3) | `0000000` | Desabilita o monitoramento visual do reservatório `x` e apaga seu LED RGB. |
 | `CMP x,n` | `1000` | Reservatório (1..3) | Limite (0..100) | Calcula `NIVEL[x] - n` via ULA e atualiza `ACC` e flags `L`, `Z`, `G`. |
