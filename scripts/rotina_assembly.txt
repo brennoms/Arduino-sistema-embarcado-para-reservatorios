@@ -1,0 +1,76 @@
+; ligar a bomba em 20%
+; desligar a bomba em 95%
+; tocar alarme em 10%
+
+
+LOAD
+
+LED 1 ; 0x00
+LED 2 ; 0x01
+LED 3 ; 0x02
+
+READ 1       ; 0x03
+CMP 1, 20    ; 0x04
+JL 0x22      ; 0x05 - liga a bomba 1
+CMP 1, 95    ; 0x06
+JG 0x24      ; 0x07 - desliga a bomba 1
+CMP 1, 10    ; 0x08
+JL 0x26      ; 0x09 - aciona o alarme 1
+SILENCE 1    ; 0x0A
+
+INFO 1       ; 0x0B
+WAIT 20      ; 0x0C
+
+
+READ 2       ; 0x0D
+CMP 2, 20    ; 0x0E
+JL 0x28      ; 0x0F - liga a bomba 2
+CMP 2, 95    ; 0x10
+JG 0x2A      ; 0x11 - desliga a bomba 2
+CMP 2, 10    ; 0x12
+JL 0x2C      ; 0x13 - aciona o alarme 2
+SILENCE 2    ; 0x14
+
+INFO 2       ; 0x15
+WAIT 20      ; 0x16
+
+
+READ 3       ; 0x17
+CMP 3, 20    ; 0x18
+JL 0x2E      ; 0x19 - liga a bomba 3
+CMP 3, 95    ; 0x1A
+JG 0x30      ; 0x1B - desliga a bomba 3
+CMP 3, 10    ; 0x1C
+JL 0x32      ; 0x1D - aciona o alarme 3
+SILENCE 3    ; 0x1E
+
+INFO 3       ; 0x1F
+WAIT 20      ; 0x20
+
+
+JMP 0x03     ; 0x21 - reinicia o ciclo de monitoramento
+
+
+; ================
+; area de desvio
+
+ON 1          ; 0x22
+JMP 0x06      ; 0x23 - continua a verificacao da bomba 1
+OFF 1         ; 0x24
+JMP 0x08      ; 0x25 - verifica o alarme da bomba 1
+ALARM 1       ; 0x26
+JMP 0x0D      ; 0x27 - segue para o reservatorio 2
+
+ON 2          ; 0x28
+JMP 0x10      ; 0x29 - continua a verificacao da bomba 2
+OFF 2         ; 0x2A
+JMP 0x12      ; 0x2B - verifica o alarme da bomba 2
+ALARM 2       ; 0x2C
+JMP 0x17      ; 0x2D - segue para o reservatorio 3
+
+ON 3          ; 0x2E
+JMP 0x1A      ; 0x2F - continua a verificacao da bomba 3
+OFF 3         ; 0x30
+JMP 0x1C      ; 0x31 - verifica o alarme da bomba 3
+ALARM 3       ; 0x32
+JMP 0x1F      ; 0x33 - segue para a telemetria
