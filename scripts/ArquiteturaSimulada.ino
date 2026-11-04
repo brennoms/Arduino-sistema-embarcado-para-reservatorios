@@ -59,9 +59,9 @@ const uint8_t PIN_BOMBA[3] = {46, 47, 48};
 const uint8_t PIN_RGB_R[3] = {38, 40, 42};
 const uint8_t PIN_RGB_G[3] = {39, 41, 43};
 
-const uint8_t PIN_BUZZER = 52;
-const uint8_t PIN_DISPLAY_DEZENAS[7] = {22, 23, 24, 25, 26, 27, 28}; // DISP1: a,b,c,d,e,f,g
-const uint8_t PIN_DISPLAY_UNIDADES[7] = {29, 30, 31, 32, 33, 34, 35}; // DISP2: a,b,c,d,e,f,g
+const uint8_t PIN_BUZZER = 49;
+const uint8_t PIN_DISPLAY_DEZENAS[7] = {36, 37, 30, 35, 34, 28, 31}; // DISP1: a,b,c,d,e,f,g
+const uint8_t PIN_DISPLAY_UNIDADES[7] = {26, 29, 25, 24, 27, 23, 22}; // DISP2: a,b,c,d,e,f,g
 
 // Os displays HS-5101BS do esquema têm anodo comum.
 #define DISPLAY_ACTIVE_HIGH false
