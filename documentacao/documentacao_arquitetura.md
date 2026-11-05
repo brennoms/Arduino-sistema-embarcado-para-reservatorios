@@ -265,7 +265,7 @@ registrador válida antes de desviar.
 | `END` | Valida as instruções, verifica integridade SECDED da carga, destinos de saltos e fecha a montagem. |
 | `RUN` | Prepara o sistema para o modo de execução passo a passo a partir de `0x00`. |
 | `STEP` ou `*` | Executa um único ciclo de instrução (Busca → Decodifica → Executa) e emite telemetria. |
-| `AUTO` | Executa o programa continuamente em alta velocidade. |
+| `AUTO` | Executa o programa continuamente em alta velocidade, sem emitir o trace detalhado de cada instrução; mensagens específicas de operações, erros e comandos continuam sendo exibidas. |
 | `STOP` | Interrompe imediatamente qualquer execução ou temporização, desligando bombas, alarmes e LEDs RGB. |
 | `STATUS` | Exibe o painel geral da CPU, registradores, atuadores, estado dos 3 LEDs RGB (`VERMELHO`, `AMARELO`, `VERDE` ou `OFF`) e estatísticas SECDED. |
 | `MEM [ini fim]` | Despeja a memória exibindo o endereço, a palavra física SECDED (24 bits), a palavra lógica ISA (18 bits) e o diagnóstico ECC. |

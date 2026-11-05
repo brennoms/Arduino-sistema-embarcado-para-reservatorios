@@ -174,7 +174,7 @@ Durante a carga, o montador ignora linhas vazias e comentários iniciados por po
 | `END` | Verifica as instruções carregadas e encerra a carga. |
 | `RUN` | Reinicia a execução em `0x00` e habilita o modo passo a passo. |
 | `STEP` ou `*` | Executa a próxima instrução no modo passo a passo. |
-| `AUTO` | Reinicia em `0x00` e executa as instruções em sequência, respeitando os saltos e as esperas. |
+| `AUTO` | Reinicia em `0x00` e executa as instruções em sequência, respeitando os saltos e as esperas, sem emitir o trace detalhado de cada instrução. |
 | `MEM` ou `MEM 0x00 0x03` | Consulta toda a memória ou apenas o intervalo especificado. |
 | `STATUS` | Mostra o modo, os registradores, os níveis, as saídas e os contadores de falhas de memória. |
 | `FLIP 0x00 10` | Inverte um bit físico para testar a proteção SECDED. |

@@ -22,6 +22,7 @@ except ImportError:
 
 BAUD_RATE = 115200
 ARQUIVO_ROTINA = Path(__file__).with_name("rotina_assembly.txt")
+ARQUIVO_LOG = Path(__file__).with_name("log.txt")
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -79,18 +80,50 @@ def escolher_porta() -> str:
         print("Escolha um numero da lista.")
 
 
-def enviar_programa(porta: str, linhas: list[str], intervalo: float) -> None:
+def registrar_resposta(conexao: serial.Serial, arquivo_log) -> None:
+    while conexao.in_waiting:
+        resposta = conexao.readline().decode("utf-8", errors="replace")
+        if not resposta:
+            return
+        print(resposta, end="")
+        arquivo_log.write(resposta)
+        arquivo_log.flush()
+
+
+def enviar_programa(
+    porta: str,
+    linhas: list[str],
+    intervalo: float,
+    caminho_log: Path,
+) -> None:
     if intervalo < 0:
         raise ValueError("o intervalo nao pode ser negativo")
 
-    with serial.Serial(porta, BAUD_RATE, timeout=1, write_timeout=2) as conexao:
+    with (
+        serial.Serial(porta, BAUD_RATE, timeout=0.1, write_timeout=2) as conexao,
+        caminho_log.open("a", encoding="utf-8") as arquivo_log,
+    ):
         time.sleep(2)
+        registrar_resposta(conexao, arquivo_log)
+
         for numero, linha in enumerate(linhas, start=1):
             conexao.write((linha + "\n").encode("ascii"))
             conexao.flush()
             print(f"[{numero:03d}/{len(linhas):03d}] {linha}")
             if intervalo:
                 time.sleep(intervalo)
+            registrar_resposta(conexao, arquivo_log)
+
+        print(f"Monitorando respostas; gravando em {caminho_log}. Pressione Ctrl+C para sair.")
+        try:
+            while True:
+                resposta = conexao.readline().decode("utf-8", errors="replace")
+                if resposta:
+                    print(resposta, end="")
+                    arquivo_log.write(resposta)
+                    arquivo_log.flush()
+        except KeyboardInterrupt:
+            print("\nMonitoramento encerrado.")
 
 
 def main() -> int:
@@ -99,7 +132,7 @@ def main() -> int:
     try:
         porta = argumentos.porta or escolher_porta()
         linhas = carregar_linhas(ARQUIVO_ROTINA)
-        enviar_programa(porta, linhas, argumentos.intervalo)
+        enviar_programa(porta, linhas, argumentos.intervalo, ARQUIVO_LOG)
     except (OSError, RuntimeError, ValueError, serial.SerialException) as erro:
         print(f"Erro ao enviar a rotina: {erro}", file=sys.stderr)
         return 1
