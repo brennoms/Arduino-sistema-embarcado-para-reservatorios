@@ -121,7 +121,7 @@ A ISA opera sobre uma palavra lógica de **18 bits**, invariável para todas as 
 
 ```
 
-* **4 bits de Opcode:** comportam as 15 instruções ativas (`0000` a `1110`) e 1 código reservado/inválido (`1111`).
+* **4 bits de Opcode:** comportam 15 instruções com opcode direto (`0000` a `1110`) e o opcode estendido `1111`, usado pelas instruções do registrador geral (`CMPREG`, `JREG` e `REGSUM`), cuja operação é definida pelo campo `OP2`.
 * **7 bits de Operando 1:** suportam endereços de 0 a 127 (`0x00` a `0x7F`), identificação de bomba/reservatório (`1..3`) ou tempos de espera `WAIT` (`0..127 ticks` = `0..12,7 s`).
 * **7 bits de Operando 2:** suportam percentuais de 0 a 100 (`CMP`) ou preenchimento com zeros.
 

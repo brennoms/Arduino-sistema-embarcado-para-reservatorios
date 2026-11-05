@@ -107,7 +107,7 @@ O comando `MEM` mostra a palavra física de 24 bits, a instrução de 18 bits e 
 
 ### Conjunto de instruções
 
-A palavra lógica tem 4 bits de opcode e dois operandos de 7 bits cada. Os espaços nos exemplos separam esses campos. Campos sem uso ficam zerados e o opcode `1111` é inválido.
+A palavra lógica tem 4 bits de opcode e dois operandos de 7 bits cada. Os espaços nos exemplos separam esses campos. Campos sem uso ficam zerados. Os opcodes `0000` a `1110` identificam instruções diretamente; o opcode `1111` é estendido e identifica as instruções do registrador geral, com a operação definida pelo campo `OP2`.
 
 | Instrução | Efeito | Exemplo | Palavra lógica de 18 bits |
 | --- | --- | --- | --- |
