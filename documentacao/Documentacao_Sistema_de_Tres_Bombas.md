@@ -82,8 +82,10 @@ A memória tem 128 posições, de `0x00` a `0x7F`. As palavras somam 288 bytes d
 | `MBR_RAW` | Guarda a representação de 24 bits usada no acesso à memória. Após uma correção de um bit na busca, recebe a palavra corrigida. |
 | `IR` | Guarda a instrução que será decodificada e executada. |
 | `ACC` | Guarda o último percentual lido ou o resultado da última operação de comparação. |
+| `REG` | Registrador geral assinado usado para contadores e cálculos incrementais. |
 | `NIVEL` e `NIVEL_VALIDO` | Guardam a última leitura de cada reservatório e indicam se ela pode ser usada por `CMP`. |
 | `FLAG_L`, `FLAG_Z`, `FLAG_G` | Guardam o resultado da comparação usado pelas instruções de desvio. |
+| `FLAG_REG` | É atualizada por `CMPREG` e indica que `REG` é menor que o limite; `JREG` usa essa flag. |
 
 ### Busca e decodificação
 
@@ -123,6 +125,9 @@ A palavra lógica tem 4 bits de opcode e dois operandos de 7 bits cada. Os espa�
 | `JE a` | Salta se a última comparação indicou igual. | `JE 0x0A` | `1011 0001010 0000000` |
 | `JG a` | Salta se a última comparação indicou maior. | `JG 0x0B` | `1100 0001011 0000000` |
 | `WAIT t` | Aguarda `t × 100 ms` e continua atendendo o monitor serial. | `WAIT 10` | `1101 0001010 0000000` |
+| `CMPREG n` | Compara o registrador geral com `n` e ativa `FLAG_REG` quando `REG < n`. | `CMPREG 20` | `1111 0001010 0000000` |
+| `JREG a` | Salta para `a` quando `FLAG_REG` está ativa. | `JREG 0x05` | `1111 0000101 0000001` |
+| `REGSUM n` | Soma `n` ao registrador geral; aceita valores de -64 a 63. | `REGSUM -1` | `1111 1111111 0000010` |
 | `HALT` | Encerra o programa e mantém as saídas. | `HALT` | `1110 0000000 0000000` |
 
 Com a última leitura da bomba 1 em 20%, `CMP 1, 30` grava `−10` no `ACC` e ativa a flag `L`. Em complemento de dois, `−10` corresponde a `1111111111110110` nos 16 bits do acumulador. O sketch mostra também uma representação de 18 bits com extensão de sinal no monitor.
@@ -132,6 +137,10 @@ Com a última leitura da bomba 1 em 20%, `CMP 1, 30` grava `−10` no `ACC` e at
 Durante a carga, o montador verifica a quantidade de operandos, a faixa dos valores e o formato dos endereços. As instruções que recebem um número de reservatório aceitam valores de 1 a 3. O limite de `CMP` é um inteiro de 0 a 100. O comando `END` também verifica se os destinos dos desvios apontam para posições carregadas.
 
 Durante a execução, `CMP` exige que o reservatório indicado já tenha uma leitura válida. Os desvios condicionais exigem uma comparação válida. Uma sequência comum é `READ 1`, `CMP 1, 30` e `JL 0x09`. Se a leitura for de 29%, a diferença será −1 e o desvio será executado. A 30%, a diferença será zero e a execução seguirá para o endereço seguinte.
+
+`REGSUM` aceita imediatos assinados de -64 a 63. A combinação `REGSUM 1`,
+`CMPREG 20` e `JREG a` permite repetir um ciclo até o registrador alcançar
+20, sem bloquear o monitor serial. `JREG` exige um `CMPREG` anterior válido.
 
 ## Como executar
 

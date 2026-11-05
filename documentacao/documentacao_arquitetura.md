@@ -197,9 +197,11 @@ $$128 \times 32 \text{ bits} = 512 \text{ bytes}$$
 | `CONTADOR_SEC` | 16 bits | Total acumulado de erros simples corrigidos desde o último `LOAD` |
 | `CONTADOR_DED` | 16 bits | Total acumulado de erros duplos detectados desde o último `LOAD` |
 | `ACC` | `int16_t` | Acumulador assinado (armazena leituras e resultados da ULA) |
+| `REG` | `int16_t` | Registrador geral assinado, alterado por `REGSUM` e comparado por `CMPREG` |
 | `OPCODE_REG` | 4 bits | Código da operação decodificada |
 | `OP1`, `OP2` | 7 bits cada | Operandos decodificados da instrução |
 | `FLAGS (L, Z, G)` | 1 bit cada | Indicadores condicionais da ULA ($<, =, >$) |
+| `FLAG_REG` | 1 bit | Fica ativa quando o último `CMPREG` encontrou `REG < n` e é usada por `JREG` |
 | `LED_HABILITADO[3]` | `bool[3]` | Habilitação do monitoramento visual contínuo por LED RGB de cada reservatório |
 | `BOMBA_LIGADA[3]` | `bool[3]` | Estado operacional dos motores das bombas (1..3) |
 | `ALARME_CORRETIVO[3]` | `bool[3]` | Sinalizador de manutenção corretiva e acionamento de alarme acústico |
@@ -244,6 +246,14 @@ A ISA possui formato fixo de 18 bits (`OPCODE [4] | OP1 [7] | OP2 [7]`):
 | `JG a` | `1100` | Endereço (0x00..0x7F) | `0000000` | Desvia para `a` se `FLAG_G == 1`. |
 | `WAIT t` | `1101` | Ticks (0..127) | `0000000` | Pausa por $t \times 100\text{ ms}$ de forma não bloqueante. |
 | `HALT` | `1110` | `0000000` | `0000000` | Encerra a execução mantendo estados atuais dos atuadores e LEDs. |
+| `CMPREG n` | `1111/0000000` | Imediato assinado (-64..63) | `0000000` | Compara `REG` com `n` e atualiza `FLAG_REG` (`1` quando `REG < n`). |
+| `JREG a` | `1111/0000001` | Endereço (0x00..0x7F) | `0000001` | Desvia para `a` quando `FLAG_REG == 1`. |
+| `REGSUM n` | `1111/0000010` | Imediato assinado (-64..63) | `0000010` | Soma `n` ao registrador geral `REG`. |
+
+As três instruções de registrador usam o opcode estendido `1111`; o campo `OP2`
+identifica o mnemônico. O imediato assinado usa complemento de dois em 7 bits.
+`CMPREG` atualiza exclusivamente `FLAG_REG`, e `JREG` exige uma comparação de
+registrador válida antes de desviar.
 
 ---
 

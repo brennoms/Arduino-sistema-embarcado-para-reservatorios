@@ -1,76 +1,82 @@
 ; ligar a bomba em 20%
 ; desligar a bomba em 95%
 ; tocar alarme em 10%
-
+;
+; O registrador REG conta os ciclos de um segundo.
+; A cada ciclo as verificacoes sao executadas novamente.
+; REG=0..19 exibe INFO 1, REG=20..39 exibe INFO 2,
+; REG=40..59 exibe INFO 3 e depois o contador reinicia.
 
 LOAD
 
-LED 1 ; 0x00
-LED 2 ; 0x01
-LED 3 ; 0x02
+LED 1        ; 0x00
+LED 2        ; 0x01
+LED 3        ; 0x02
 
-READ 1       ; 0x03
-CMP 1, 20    ; 0x04
-JL 0x22      ; 0x05 - liga a bomba 1
-CMP 1, 95    ; 0x06
-JG 0x24      ; 0x07 - desliga a bomba 1
-CMP 1, 10    ; 0x08
-JL 0x26      ; 0x09 - aciona o alarme 1
-SILENCE 1    ; 0x0A
+INFO 1       ; 0x03
+JMP 0x05     ; 0x04 - inicia o ciclo de verificacao
 
-INFO 1       ; 0x0B
-WAIT 20      ; 0x0C
+WAIT 10      ; 0x05 - aguarda 1 segundo sem bloquear o monitor
+READ 1       ; 0x06
+CMP 1, 20    ; 0x07
+JL 0x2C      ; 0x08 - liga a bomba 1
+CMP 1, 95    ; 0x09
+JG 0x2E      ; 0x0A - desliga a bomba 1
+CMP 1, 10    ; 0x0B
+JL 0x30      ; 0x0C - aciona o alarme 1
+SILENCE 1    ; 0x0D
 
+READ 2       ; 0x0E
+CMP 2, 20    ; 0x0F
+JL 0x32      ; 0x10 - liga a bomba 2
+CMP 2, 95    ; 0x11
+JG 0x34      ; 0x12 - desliga a bomba 2
+CMP 2, 10    ; 0x13
+JL 0x36      ; 0x14 - aciona o alarme 2
+SILENCE 2    ; 0x15
 
-READ 2       ; 0x0D
-CMP 2, 20    ; 0x0E
-JL 0x28      ; 0x0F - liga a bomba 2
-CMP 2, 95    ; 0x10
-JG 0x2A      ; 0x11 - desliga a bomba 2
-CMP 2, 10    ; 0x12
-JL 0x2C      ; 0x13 - aciona o alarme 2
-SILENCE 2    ; 0x14
+READ 3       ; 0x16
+CMP 3, 20    ; 0x17
+JL 0x38      ; 0x18 - liga a bomba 3
+CMP 3, 95    ; 0x19
+JG 0x3A      ; 0x1A - desliga a bomba 3
+CMP 3, 10    ; 0x1B
+JL 0x3C      ; 0x1C - aciona o alarme 3
+SILENCE 3    ; 0x1D
 
-INFO 2       ; 0x15
-WAIT 20      ; 0x16
+REGSUM 1     ; 0x1E - um ciclo de um segundo concluido
+CMPREG 20    ; 0x1F
+JREG 0x05    ; 0x20 - continua verificando ate 20 ciclos
+CMPREG 40    ; 0x21
+JREG 0x27    ; 0x22 - troca para INFO 2
+CMPREG 60    ; 0x23
+JREG 0x2A    ; 0x24 - troca para INFO 3
+REGSUM -60   ; 0x25 - reinicia o contador para INFO 1
+JMP 0x03     ; 0x26
 
+INFO 2       ; 0x27
+JMP 0x05     ; 0x28
+INFO 3       ; 0x29
+REGSUM -40   ; 0x2A - reinicia o contador para INFO 1
+JMP 0x03     ; 0x2B
 
-READ 3       ; 0x17
-CMP 3, 20    ; 0x18
-JL 0x2E      ; 0x19 - liga a bomba 3
-CMP 3, 95    ; 0x1A
-JG 0x30      ; 0x1B - desliga a bomba 3
-CMP 3, 10    ; 0x1C
-JL 0x32      ; 0x1D - aciona o alarme 3
-SILENCE 3    ; 0x1E
+ON 1          ; 0x2C
+JMP 0x09      ; 0x2D - continua a verificacao da bomba 1
+OFF 1         ; 0x2E
+JMP 0x0B      ; 0x2F - verifica o alarme da bomba 1
+ALARM 1       ; 0x30
+JMP 0x0E      ; 0x31 - segue para o reservatorio 2
 
-INFO 3       ; 0x1F
-WAIT 20      ; 0x20
+ON 2          ; 0x32
+JMP 0x11      ; 0x33 - continua a verificacao da bomba 2
+OFF 2         ; 0x34
+JMP 0x13      ; 0x35 - verifica o alarme da bomba 2
+ALARM 2       ; 0x36
+JMP 0x16      ; 0x37 - segue para o reservatorio 3
 
-
-JMP 0x03     ; 0x21 - reinicia o ciclo de monitoramento
-
-
-; ================
-; area de desvio
-
-ON 1          ; 0x22
-JMP 0x06      ; 0x23 - continua a verificacao da bomba 1
-OFF 1         ; 0x24
-JMP 0x08      ; 0x25 - verifica o alarme da bomba 1
-ALARM 1       ; 0x26
-JMP 0x0D      ; 0x27 - segue para o reservatorio 2
-
-ON 2          ; 0x28
-JMP 0x10      ; 0x29 - continua a verificacao da bomba 2
-OFF 2         ; 0x2A
-JMP 0x12      ; 0x2B - verifica o alarme da bomba 2
-ALARM 2       ; 0x2C
-JMP 0x17      ; 0x2D - segue para o reservatorio 3
-
-ON 3          ; 0x2E
-JMP 0x1A      ; 0x2F - continua a verificacao da bomba 3
-OFF 3         ; 0x30
-JMP 0x1C      ; 0x31 - verifica o alarme da bomba 3
-ALARM 3       ; 0x32
-JMP 0x1F      ; 0x33 - segue para a telemetria
+ON 3          ; 0x38
+JMP 0x19      ; 0x39 - continua a verificacao da bomba 3
+OFF 3         ; 0x3A
+JMP 0x1B      ; 0x3B - verifica o alarme da bomba 3
+ALARM 3       ; 0x3C
+JMP 0x1E      ; 0x3D - segue para a telemetria

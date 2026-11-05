@@ -83,12 +83,17 @@ enum Opcode : uint8_t {
     OP_JG,
     OP_WAIT,
     OP_HALT,
-    OP_INVALID = 15
+    OP_REG = 15
 };
 
-const char *NOME_OPCODE[15] = {
+const Opcode OP_INVALID = (Opcode)16;
+const uint8_t REG_SUBOP_CMP = 0;
+const uint8_t REG_SUBOP_JUMP = 1;
+const uint8_t REG_SUBOP_SUM = 2;
+
+const char *NOME_OPCODE[16] = {
     "READ", "ON", "OFF", "ALARM", "LED", "INFO", "SILENCE", "LEDOFF",
-    "CMP", "JMP", "JL", "JE", "JG", "WAIT", "HALT"
+    "CMP", "JMP", "JL", "JE", "JG", "WAIT", "HALT", "REG"
 };
 
 // ============================ Sinais de memória =============================
@@ -162,7 +167,8 @@ uint16_t     CONTADOR_SEC = 0;         // total de erros simples corrigidos desd
 uint16_t     CONTADOR_DED = 0;         // total de erros duplos detectados desde o LOAD
 
 int16_t  ACC = 0;                      // resultado assinado; faixa útil -100..100
-uint8_t  OPCODE_REG = OP_INVALID;
+int16_t  REG = 0;                      // registrador de uso geral assinado
+uint8_t  OPCODE_REG = OP_REG;
 uint8_t  OP1 = 0;
 uint8_t  OP2 = 0;
 
@@ -173,6 +179,8 @@ bool FLAG_L = false;
 bool FLAG_Z = false;
 bool FLAG_G = false;
 bool COMPARACAO_VALIDA = false;
+bool FLAG_REG = false;                 // CMPREG: REG < n
+bool COMPARACAO_REG_VALIDA = false;
 
 bool BOMBA_LIGADA[3] = {false, false, false};
 bool LED_HABILITADO[3] = {false, false, false};
@@ -308,6 +316,27 @@ bool parseDecimal(const char *texto, int min, int max, int *saida) {
     }
 
     *saida = (int)valor;
+    return true;
+}
+
+bool parseSigned7(const char *texto, int *saida) {
+    if (texto == NULL || texto[0] == '\0' || saida == NULL) return false;
+
+    bool negativo = texto[0] == '-';
+    const char *digitos = negativo ? texto + 1 : texto;
+    if (*digitos == '\0') return false;
+
+    int valor = 0;
+    for (size_t i = 0; digitos[i] != '\0'; ++i) {
+        if (digitos[i] < '0' || digitos[i] > '9') return false;
+        valor = valor * 10 + (digitos[i] - '0');
+        if (valor > 64) return false;
+    }
+
+    valor = negativo ? -valor : valor;
+    if (valor < -64 || valor > 63) return false;
+
+    *saida = valor;
     return true;
 }
 
@@ -689,7 +718,7 @@ Opcode DECODER() {
     OP1 = (IR >> OPERANDO1_SHIFT) & MASCARA_7_BITS;
     OP2 = IR & MASCARA_7_BITS;
 
-    if (OPCODE_REG <= OP_HALT) {
+    if (OPCODE_REG <= OP_REG) {
         return (Opcode)OPCODE_REG;
     }
 
@@ -715,6 +744,10 @@ void atualizarFlagsDaULA() {
     FLAG_Z = (ULA_RESULTADO == 0);
     FLAG_G = (ULA_RESULTADO > 0);
     COMPARACAO_VALIDA = true;
+}
+
+int8_t decodificarImediato7(uint8_t valor) {
+    return (valor & 0x40) ? (int8_t)(valor - 128) : (int8_t)valor;
 }
 
 // ============================ Validação da ISA ===============================
@@ -758,6 +791,10 @@ bool palavraDecodificadaValida(Opcode opcode, uint8_t op1, uint8_t op2) {
         case OP_WAIT:
             return op1 <= MAX_WAIT_TICKS && op2 == 0;
 
+        case OP_REG:
+            return (op2 == REG_SUBOP_CMP || op2 == REG_SUBOP_JUMP || op2 == REG_SUBOP_SUM) &&
+                   (op2 != REG_SUBOP_JUMP || op1 < TAM_MEMORIA);
+
         case OP_HALT:
             return op1 == 0 && op2 == 0;
 
@@ -796,7 +833,8 @@ bool validarDestinosDosDesvios() {
             return false;
         }
 
-        if (opcodeUsaEndereco(opcode) && !validarDestinoCarregado(op1)) {
+        bool ehDesvioREG = opcode == OP_REG && op2 == REG_SUBOP_JUMP;
+        if ((opcodeUsaEndereco(opcode) || ehDesvioREG) && !validarDestinoCarregado(op1)) {
             Serial.print(F("ERRO: destino "));
             imprimirEndereco(op1);
             Serial.print(F(" da instrucao em "));
@@ -813,7 +851,13 @@ bool validarDestinosDosDesvios() {
 int ASSEMBLY(const char *instrucao) {
     if (instrucao == NULL) return -1;
 
-    for (uint8_t i = 0; i < 15; ++i) {
+    if (strcmp(instrucao, "CMPREG") == 0 ||
+        strcmp(instrucao, "JREG") == 0 ||
+        strcmp(instrucao, "REGSUM") == 0) {
+        return OP_REG;
+    }
+
+    for (uint8_t i = 0; i < 16; ++i) {
         if (strcmp(instrucao, NOME_OPCODE[i]) == 0) {
             return i;
         }
@@ -848,6 +892,21 @@ bool montarPalavra(const char *mnem, const char *op1Texto, const char *op2Texto,
             return false;
         }
         op2 = (uint8_t)valor;
+    }
+    else if (opcode == OP_REG) {
+        if (op1Texto == NULL || op2Texto != NULL) {
+            return false;
+        }
+
+        if (strcmp(mnem, "JREG") == 0) {
+            if (!parseEnderecoHex(op1Texto, &op1)) return false;
+            op2 = REG_SUBOP_JUMP;
+        } else {
+            if (strcmp(mnem, "CMPREG") != 0 && strcmp(mnem, "REGSUM") != 0) return false;
+            if (!parseSigned7(op1Texto, &valor)) return false;
+            op1 = (uint8_t)(valor < 0 ? valor + 128 : valor);
+            op2 = strcmp(mnem, "CMPREG") == 0 ? REG_SUBOP_CMP : REG_SUBOP_SUM;
+        }
     }
     else if (opcodeUsaEndereco(opcode)) {
         if (op1Texto == NULL || op2Texto != NULL) return false;
@@ -965,7 +1024,8 @@ void resetarRegistradoresExecucao() {
     MBR_RAW = 0;
     IR = 0;
     ACC = 0;
-    OPCODE_REG = OP_INVALID;
+    REG = 0;
+    OPCODE_REG = OP_REG;
     OP1 = 0;
     OP2 = 0;
 
@@ -982,6 +1042,8 @@ void resetarRegistradoresExecucao() {
     FLAG_Z = false;
     FLAG_G = false;
     COMPARACAO_VALIDA = false;
+    FLAG_REG = false;
+    COMPARACAO_REG_VALIDA = false;
 
     ULA_OPERACAO = ULA_NENHUMA;
     ULA_A = 0;
@@ -1141,6 +1203,32 @@ void executarCMP(uint8_t bomba, uint8_t limite) {
     avancarPC();
 }
 
+void executarCMPREG(int8_t limite) {
+    FLAG_REG = REG < limite;
+    COMPARACAO_REG_VALIDA = true;
+    avancarPC();
+}
+
+void executarREGSUM(int8_t valor) {
+    REG += valor;
+    avancarPC();
+}
+
+void executarJMP(uint8_t destino);
+
+void executarJREG(uint8_t destino) {
+    if (!COMPARACAO_REG_VALIDA) {
+        erroExecucao("JREG sem CMPREG valido");
+        return;
+    }
+
+    if (FLAG_REG) {
+        executarJMP(destino);
+    } else {
+        avancarPC();
+    }
+}
+
 void executarJMP(uint8_t destino) {
     if (!validarDestinoCarregado(destino)) {
         erroExecucao("JMP para posicao nao carregada");
@@ -1199,6 +1287,22 @@ void executarHALT() {
 void imprimirMnemonicoDecodificado(Opcode opcode, uint8_t op1, uint8_t op2) {
     if (opcode == OP_INVALID) {
         Serial.print(F("INVALID"));
+        return;
+    }
+
+    if (opcode == OP_REG) {
+        if (op2 == REG_SUBOP_CMP) Serial.print(F("CMPREG "));
+        else if (op2 == REG_SUBOP_JUMP) {
+            Serial.print(F("JREG "));
+            imprimirEndereco(op1);
+            return;
+        } else if (op2 == REG_SUBOP_SUM) Serial.print(F("REGSUM "));
+        else {
+            Serial.print(F("REG "));
+            Serial.print(op1);
+            return;
+        }
+        Serial.print(decodificarImediato7(op1));
         return;
     }
 
@@ -1288,6 +1392,12 @@ void imprimirTrace(uint8_t enderecoExecutado, Opcode opcode, uint8_t op1, uint8_
     Serial.print(FLAG_G ? 1 : 0);
     Serial.print(F(" validCmp="));
     Serial.println(COMPARACAO_VALIDA ? 1 : 0);
+    Serial.print(F("REG decimal="));
+    Serial.println(REG);
+    Serial.print(F("FLAG_REG="));
+    Serial.print(FLAG_REG ? 1 : 0);
+    Serial.print(F(" validCmpReg="));
+    Serial.println(COMPARACAO_REG_VALIDA ? 1 : 0);
 
     Serial.print(F("NIVEIS: ["));
     for (uint8_t i = 0; i < 3; ++i) {
@@ -1372,6 +1482,12 @@ void UC() {
         case OP_JG:      executarCondicional(OP_JG, OP1); break;
         case OP_WAIT:    executarWAIT(OP1); break;
         case OP_HALT:    executarHALT(); break;
+        case OP_REG:
+            if (OP2 == REG_SUBOP_CMP) executarCMPREG(decodificarImediato7(OP1));
+            else if (OP2 == REG_SUBOP_JUMP) executarJREG(OP1);
+            else if (OP2 == REG_SUBOP_SUM) executarREGSUM(decodificarImediato7(OP1));
+            else erroExecucao("subopcode REG desconhecido");
+            break;
         default:         erroExecucao("opcode desconhecido"); return;
     }
 
@@ -1574,7 +1690,7 @@ void comandoSTATUS() {
     Serial.println(CONTADOR_DED);
 
     Serial.print(F("OPCODE="));
-    if (OPCODE_REG <= OP_HALT) {
+    if (OPCODE_REG <= OP_REG) {
         Serial.print(OPCODE_REG, BIN);
         Serial.print(F(" ("));
         Serial.print(NOME_OPCODE[OPCODE_REG]);
@@ -1602,6 +1718,12 @@ void comandoSTATUS() {
     Serial.print(FLAG_G ? 1 : 0);
     Serial.print(F(" validCmp="));
     Serial.println(COMPARACAO_VALIDA ? 1 : 0);
+    Serial.print(F("REG="));
+    Serial.println(REG);
+    Serial.print(F("FLAG_REG="));
+    Serial.print(FLAG_REG ? 1 : 0);
+    Serial.print(F(" validCmpReg="));
+    Serial.println(COMPARACAO_REG_VALIDA ? 1 : 0);
 
     for (uint8_t i = 0; i < 3; ++i) {
         Serial.print(F("Bomba "));
