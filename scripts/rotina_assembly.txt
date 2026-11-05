@@ -16,33 +16,34 @@ LED 3        ; 0x02
 INFO 1       ; 0x03
 JMP 0x05     ; 0x04 - inicia o ciclo de verificacao
 
-WAIT 10      ; 0x05 - aguarda 1 segundo sem bloquear o monitor
-READ 1       ; 0x06
-CMP 1, 20    ; 0x07
-JL 0x2C      ; 0x08 - liga a bomba 1
-CMP 1, 95    ; 0x09
-JG 0x2E      ; 0x0A - desliga a bomba 1
-CMP 1, 10    ; 0x0B
-JL 0x30      ; 0x0C - aciona o alarme 1
-SILENCE 1    ; 0x0D
+READ 1       ; 0x05
+CMP 1, 20    ; 0x06
+JL 0x2C      ; 0x07 - liga a bomba 1
+CMP 1, 95    ; 0x08
+JG 0x2E      ; 0x09 - desliga a bomba 1
+CMP 1, 10    ; 0x0A
+JL 0x30      ; 0x0B - aciona o alarme 1
+SILENCE 1    ; 0x0C
 
-READ 2       ; 0x0E
-CMP 2, 20    ; 0x0F
-JL 0x32      ; 0x10 - liga a bomba 2
-CMP 2, 95    ; 0x11
-JG 0x34      ; 0x12 - desliga a bomba 2
-CMP 2, 10    ; 0x13
-JL 0x36      ; 0x14 - aciona o alarme 2
-SILENCE 2    ; 0x15
+READ 2       ; 0x0D
+CMP 2, 20    ; 0x0E
+JL 0x32      ; 0x0F - liga a bomba 2
+CMP 2, 95    ; 0x10
+JG 0x34      ; 0x11 - desliga a bomba 2
+CMP 2, 10    ; 0x12
+JL 0x36      ; 0x13 - aciona o alarme 2
+SILENCE 2    ; 0x14
 
-READ 3       ; 0x16
-CMP 3, 20    ; 0x17
-JL 0x38      ; 0x18 - liga a bomba 3
-CMP 3, 95    ; 0x19
-JG 0x3A      ; 0x1A - desliga a bomba 3
-CMP 3, 10    ; 0x1B
-JL 0x3C      ; 0x1C - aciona o alarme 3
-SILENCE 3    ; 0x1D
+READ 3       ; 0x15
+CMP 3, 20    ; 0x16
+JL 0x38      ; 0x17 - liga a bomba 3
+CMP 3, 95    ; 0x18
+JG 0x3A      ; 0x19 - desliga a bomba 3
+CMP 3, 10    ; 0x1A
+JL 0x3C      ; 0x1B - aciona o alarme 3
+SILENCE 3    ; 0x1C
+
+WAIT 10      ; 0x1D - aguarda 1 segundo sem bloquear o monitor
 
 REGSUM 1     ; 0x1E - um ciclo de um segundo concluido
 CMPREG 20    ; 0x1F
@@ -50,7 +51,7 @@ JREG 0x05    ; 0x20 - continua verificando ate 20 ciclos
 CMPREG 40    ; 0x21
 JREG 0x27    ; 0x22 - troca para INFO 2
 CMPREG 60    ; 0x23
-JREG 0x2A    ; 0x24 - troca para INFO 3
+JREG 0x29    ; 0x24 - troca para INFO 3
 REGSUM -60   ; 0x25 - reinicia o contador para INFO 1
 JMP 0x03     ; 0x26
 
@@ -59,6 +60,7 @@ JMP 0x05     ; 0x28
 INFO 3       ; 0x29
 REGSUM -40   ; 0x2A - reinicia o contador para INFO 1
 JMP 0x03     ; 0x2B
+
 
 ON 1          ; 0x2C
 JMP 0x09      ; 0x2D - continua a verificacao da bomba 1

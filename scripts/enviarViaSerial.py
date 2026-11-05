@@ -44,11 +44,11 @@ def parse_arguments() -> argparse.Namespace:
 
 def carregar_linhas(caminho: Path) -> list[str]:
     conteudo = caminho.read_text(encoding="utf-8")
-    linhas = [
-        linha.strip()
-        for linha in conteudo.splitlines()
-        if linha.strip()
-    ]
+    linhas = []
+    for linha in conteudo.splitlines():
+        instrucao = linha.split(";", 1)[0].strip()
+        if instrucao:
+            linhas.append(instrucao)
 
     linhas.extend(("END", "RUN", "AUTO"))
 
