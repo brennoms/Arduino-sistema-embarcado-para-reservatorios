@@ -1483,6 +1483,7 @@ void UC() {
 
     // ----------------------------- EXECUTA -----------------------------------
     FASE = FASE_EXECUTA;
+    bool emitirTrace = MODO != MODO_AUTO;
 
     switch (opcode) {
         case OP_READ:    executarREAD(OP1); break;
@@ -1516,8 +1517,10 @@ void UC() {
 
     CLOCK = !CLOCK;
 
-    bool mostrarProximoPC = (MODO != MODO_HALT && MODO != MODO_ERRO);
-    imprimirTrace(enderecoExecutado, opcode, OP1, OP2, mostrarProximoPC);
+    if (emitirTrace) {
+        bool mostrarProximoPC = (MODO != MODO_HALT && MODO != MODO_ERRO);
+        imprimirTrace(enderecoExecutado, opcode, OP1, OP2, mostrarProximoPC);
+    }
 
     FASE = FASE_OCIOSA;
 }
