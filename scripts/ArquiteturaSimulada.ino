@@ -937,6 +937,16 @@ bool ASSEMBLER(char *instrucao) {
 
     Serial.print(F("Montado em "));
     imprimirEndereco((uint8_t)instrucao_atual);
+    Serial.print(F(" | "));
+    Serial.print(mnem);
+    if (op1Texto != NULL) {
+        Serial.print(' ');
+        Serial.print(op1Texto);
+    }
+    if (op2Texto != NULL) {
+        Serial.print(F(", "));
+        Serial.print(op2Texto);
+    }
     Serial.print(F(" | ISA[18b]="));
     imprimirBinario18(palavra);
     Serial.print(F(" | SECDED[24b]="));
