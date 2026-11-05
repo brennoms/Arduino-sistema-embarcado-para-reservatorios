@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import sys
 import time
+from pathlib import Path
 
 try:
     import serial
@@ -20,90 +21,7 @@ except ImportError:
 
 
 BAUD_RATE = 115200
-ROTINA_ASSEMBLY = """\
-; ligar a bomba em 20%
-; desligar a bomba em 95%
-; tocar alarme em 10%
-;
-; O registrador REG conta os ciclos de um segundo.
-; A cada ciclo as verificacoes sao executadas novamente.
-; REG=0..19 exibe INFO 1, REG=20..39 exibe INFO 2,
-; REG=40..59 exibe INFO 3 e depois o contador reinicia.
-
-LOAD
-
-LED 1
-LED 2
-LED 3
-
-INFO 1
-JMP 0x05
-
-WAIT 10
-READ 1
-CMP 1, 20
-JL 0x2C
-CMP 1, 95
-JG 0x2E
-CMP 1, 10
-JL 0x30
-SILENCE 1
-
-READ 2
-CMP 2, 20
-JL 0x32
-CMP 2, 95
-JG 0x34
-CMP 2, 10
-JL 0x36
-SILENCE 2
-
-READ 3
-CMP 3, 20
-JL 0x38
-CMP 3, 95
-JG 0x3A
-CMP 3, 10
-JL 0x3C
-SILENCE 3
-
-REGSUM 1
-CMPREG 20
-JREG 0x05
-CMPREG 40
-JREG 0x27
-CMPREG 60
-JREG 0x2A
-REGSUM -60
-JMP 0x03
-
-INFO 2
-JMP 0x05
-INFO 3
-REGSUM -40
-JMP 0x03
-
-ON 1
-JMP 0x09
-OFF 1
-JMP 0x0B
-ALARM 1
-JMP 0x0E
-
-ON 2
-JMP 0x11
-OFF 2
-JMP 0x13
-ALARM 2
-JMP 0x16
-
-ON 3
-JMP 0x19
-OFF 3
-JMP 0x1B
-ALARM 3
-JMP 0x1E
-"""
+ARQUIVO_ROTINA = Path(__file__).with_name("rotina_assembly.txt")
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -124,10 +42,11 @@ def parse_arguments() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def carregar_linhas() -> list[str]:
+def carregar_linhas(caminho: Path) -> list[str]:
+    conteudo = caminho.read_text(encoding="utf-8")
     linhas = [
         linha.strip()
-        for linha in ROTINA_ASSEMBLY.splitlines()
+        for linha in conteudo.splitlines()
         if linha.strip()
     ]
 
@@ -179,7 +98,7 @@ def main() -> int:
 
     try:
         porta = argumentos.porta or escolher_porta()
-        linhas = carregar_linhas()
+        linhas = carregar_linhas(ARQUIVO_ROTINA)
         enviar_programa(porta, linhas, argumentos.intervalo)
     except (OSError, RuntimeError, ValueError, serial.SerialException) as erro:
         print(f"Erro ao enviar a rotina: {erro}", file=sys.stderr)
