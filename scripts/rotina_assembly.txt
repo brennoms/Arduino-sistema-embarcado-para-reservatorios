@@ -4,81 +4,97 @@
 ;
 ; O registrador REG conta os ciclos de um segundo.
 ; A cada ciclo as verificacoes sao executadas novamente.
-; REG=0..19 exibe INFO 1, REG=20..39 exibe INFO 2,
-; REG=40..59 exibe INFO 3 e depois o contador reinicia.
+; A primeira exibicao de cada reservatorio mostra Ln por 1 segundo.
+; As exibicoes seguintes mostram diretamente o nivel com INFO n, 0.
 
 LOAD
 
-LED 1        ; 0x00
-LED 2        ; 0x01
-LED 3        ; 0x02
+LED 1              ; 0x00
+LED 2              ; 0x01
+LED 3              ; 0x02
 
-INFO 1       ; 0x03
-JMP 0x05     ; 0x04 - inicia o ciclo de verificacao
+READ 1             ; 0x03
+CMP 1, 20          ; 0x04
+JL 0x3C            ; 0x05 - liga a bomba 1
+CMP 1, 95          ; 0x06
+JG 0x3E            ; 0x07 - desliga a bomba 1
+CMP 1, 10          ; 0x08
+JL 0x40            ; 0x09 - aciona o alarme 1
+SILENCE 1          ; 0x0A
 
-READ 1       ; 0x05
-CMP 1, 20    ; 0x06
-JL 0x2C      ; 0x07 - liga a bomba 1
-CMP 1, 95    ; 0x08
-JG 0x2E      ; 0x09 - desliga a bomba 1
-CMP 1, 10    ; 0x0A
-JL 0x30      ; 0x0B - aciona o alarme 1
-SILENCE 1    ; 0x0C
+READ 2             ; 0x0B
+CMP 2, 20          ; 0x0C
+JL 0x42            ; 0x0D - liga a bomba 2
+CMP 2, 95          ; 0x0E
+JG 0x44            ; 0x0F - desliga a bomba 2
+CMP 2, 10          ; 0x10
+JL 0x46            ; 0x11 - aciona o alarme 2
+SILENCE 2          ; 0x12
 
-READ 2       ; 0x0D
-CMP 2, 20    ; 0x0E
-JL 0x32      ; 0x0F - liga a bomba 2
-CMP 2, 95    ; 0x10
-JG 0x34      ; 0x11 - desliga a bomba 2
-CMP 2, 10    ; 0x12
-JL 0x36      ; 0x13 - aciona o alarme 2
-SILENCE 2    ; 0x14
+READ 3             ; 0x13
+CMP 3, 20          ; 0x14
+JL 0x48            ; 0x15 - liga a bomba 3
+CMP 3, 95          ; 0x16
+JG 0x4A            ; 0x17 - desliga a bomba 3
+CMP 3, 10          ; 0x18
+JL 0x4C            ; 0x19 - aciona o alarme 3
+SILENCE 3          ; 0x1A
 
-READ 3       ; 0x15
-CMP 3, 20    ; 0x16
-JL 0x38      ; 0x17 - liga a bomba 3
-CMP 3, 95    ; 0x18
-JG 0x3A      ; 0x19 - desliga a bomba 3
-CMP 3, 10    ; 0x1A
-JL 0x3C      ; 0x1B - aciona o alarme 3
-SILENCE 3    ; 0x1C
+WAIT 10            ; 0x1B - aguarda 1 segundo sem bloquear o monitor
+REGSUM 1           ; 0x1C - completa um ciclo de um segundo
 
-WAIT 10      ; 0x1D - aguarda 1 segundo sem bloquear o monitor
+CMPREG 5           ; 0x1D
+JREG 0x03          ; 0x1E - continua verificando ate 5 segundos
+CMPREG 6           ; 0x1F
+JREG 0x2D          ; 0x20 - mostra L1 na primeira exibicao
+CMPREG 10          ; 0x21
+JREG 0x30          ; 0x22 - atualiza o reservatorio 1 diretamente
+CMPREG 11          ; 0x23
+JREG 0x32          ; 0x24 - mostra L2 na primeira exibicao
+CMPREG 15          ; 0x25
+JREG 0x35          ; 0x26 - atualiza o reservatorio 2 diretamente
+CMPREG 16          ; 0x27
+JREG 0x37          ; 0x28 - mostra L3 na primeira exibicao
+CMPREG 20          ; 0x29
+JREG 0x3A          ; 0x2A - atualiza o reservatorio 3 diretamente
+REGSUM -20         ; 0x2B - reinicia o ciclo dos tres reservatorios
+JMP 0x03           ; 0x2C - inicia novo ciclo de verificacao
 
-REGSUM 1     ; 0x1E - um ciclo de um segundo concluido
-CMPREG 20    ; 0x1F
-JREG 0x05    ; 0x20 - continua verificando ate 20 ciclos
-CMPREG 40    ; 0x21
-JREG 0x27    ; 0x22 - troca para INFO 2
-CMPREG 60    ; 0x23
-JREG 0x29    ; 0x24 - troca para INFO 3
-REGSUM -60   ; 0x25 - reinicia o contador para INFO 1
-JMP 0x03     ; 0x26
+INFO 1, 1          ; 0x2D - mostra L1
+REGSUM 1           ; 0x2E - avanca para atualizacoes diretas
+JMP 0x03           ; 0x2F - retorna as verificacoes
+INFO 1, 0          ; 0x30 - mostra o nivel do reservatorio 1
+JMP 0x03           ; 0x31 - retorna as verificacoes
 
-INFO 2       ; 0x27
-JMP 0x05     ; 0x28
-INFO 3       ; 0x29
-REGSUM -40   ; 0x2A - reinicia o contador para INFO 1
-JMP 0x03     ; 0x2B
+INFO 2, 1          ; 0x32 - mostra L2
+REGSUM 1           ; 0x33 - avanca para atualizacoes diretas
+JMP 0x03           ; 0x34 - retorna as verificacoes
+INFO 2, 0          ; 0x35 - mostra o nivel do reservatorio 2
+JMP 0x03           ; 0x36 - retorna as verificacoes
 
+INFO 3, 1          ; 0x37 - mostra L3
+REGSUM 1           ; 0x38 - avanca para atualizacoes diretas
+JMP 0x03           ; 0x39 - retorna as verificacoes
+INFO 3, 0          ; 0x3A - mostra o nivel do reservatorio 3
+JMP 0x03           ; 0x3B - retorna as verificacoes
 
-ON 1          ; 0x2C
-JMP 0x09      ; 0x2D - continua a verificacao da bomba 1
-OFF 1         ; 0x2E
-JMP 0x0B      ; 0x2F - verifica o alarme da bomba 1
-ALARM 1       ; 0x30
-JMP 0x0E      ; 0x31 - segue para o reservatorio 2
+ON 1               ; 0x3C
+JMP 0x06           ; 0x3D
+OFF 1              ; 0x3E
+JMP 0x08           ; 0x3F
+ALARM 1            ; 0x40
+JMP 0x0A           ; 0x41
 
-ON 2          ; 0x32
-JMP 0x11      ; 0x33 - continua a verificacao da bomba 2
-OFF 2         ; 0x34
-JMP 0x13      ; 0x35 - verifica o alarme da bomba 2
-ALARM 2       ; 0x36
-JMP 0x16      ; 0x37 - segue para o reservatorio 3
+ON 2               ; 0x42
+JMP 0x0E           ; 0x43
+OFF 2              ; 0x44
+JMP 0x10           ; 0x45
+ALARM 2            ; 0x46
+JMP 0x12           ; 0x47
 
-ON 3          ; 0x38
-JMP 0x19      ; 0x39 - continua a verificacao da bomba 3
-OFF 3         ; 0x3A
-JMP 0x1B      ; 0x3B - verifica o alarme da bomba 3
-ALARM 3       ; 0x3C
-JMP 0x1E      ; 0x3D - segue para a telemetria
+ON 3               ; 0x48
+JMP 0x16           ; 0x49
+OFF 3              ; 0x4A
+JMP 0x18           ; 0x4B
+ALARM 3            ; 0x4C
+JMP 0x1A           ; 0x4D

@@ -610,12 +610,14 @@ int lerPercentualAnalogico(uint8_t indiceBomba) {
     return percentual;
 }
 
-void lerNivelEExibir(uint8_t indiceBomba) {
+void lerNivelEExibir(uint8_t indiceBomba, bool mostrarIdentificacao) {
     int percentual = lerPercentualAnalogico(indiceBomba);
     if (percentual < 0) return;
 
-    mostrarIdentificacaoReservatorio(indiceBomba + 1);
-    delay(1000);
+    if (mostrarIdentificacao) {
+        mostrarIdentificacaoReservatorio(indiceBomba + 1);
+        delay(1000);
+    }
 
     uint8_t percentualDisplay = percentual > 99 ? 99 : (uint8_t)percentual;
     mostrarPercentual(percentualDisplay);
@@ -777,6 +779,9 @@ bool palavraDecodificadaValida(Opcode opcode, uint8_t op1, uint8_t op2) {
         case OP_INFO:
         case OP_SILENCE:
         case OP_LEDOFF:
+            if (opcode == OP_INFO) {
+                return op1 >= 1 && op1 <= 3 && op2 <= 1;
+            }
             return op1 >= 1 && op1 <= 3 && op2 == 0;
 
         case OP_CMP:
@@ -889,6 +894,19 @@ bool montarPalavra(const char *mnem, const char *op1Texto, const char *op2Texto,
         op1 = (uint8_t)valor;
 
         if (!parseDecimal(op2Texto, 0, MAX_PERCENTUAL, &valor)) {
+            return false;
+        }
+        op2 = (uint8_t)valor;
+    }
+    else if (opcode == OP_INFO) {
+        if (op1Texto == NULL || op2Texto == NULL) return false;
+
+        if (!parseDecimal(op1Texto, 1, 3, &valor)) {
+            return false;
+        }
+        op1 = (uint8_t)valor;
+
+        if (!parseDecimal(op2Texto, 0, 1, &valor)) {
             return false;
         }
         op2 = (uint8_t)valor;
@@ -1157,10 +1175,10 @@ void executarLED(uint8_t bomba) {
     avancarPC();
 }
 
-void executarINFO(uint8_t bomba) {
+void executarINFO(uint8_t bomba, uint8_t mostrarIdentificacao) {
     if (!validarBombaOperando(bomba)) return;
 
-    lerNivelEExibir(bomba - 1);
+    lerNivelEExibir(bomba - 1, mostrarIdentificacao == 1);
     avancarPC();
 }
 
@@ -1472,7 +1490,7 @@ void UC() {
         case OP_OFF:     executarOFF(OP1); break;
         case OP_ALARM:   executarALARM(OP1); break;
         case OP_LED:     executarLED(OP1); break;
-        case OP_INFO:    executarINFO(OP1); break;
+        case OP_INFO:    executarINFO(OP1, OP2); break;
         case OP_SILENCE: executarSILENCE(OP1); break;
         case OP_LEDOFF:  executarLEDOFF(OP1); break;
         case OP_CMP:     executarCMP(OP1, OP2); break;

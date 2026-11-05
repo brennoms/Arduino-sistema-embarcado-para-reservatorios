@@ -38,7 +38,7 @@ A conversão acrescenta 511 antes da divisão inteira para arredondar o resultad
 
 ### Displays de sete segmentos
 
-O enunciado prevê um dígito para indicar a faixa de nível. O grupo usou dois displays para exibir a identificação do reservatório e o percentual. A instrução `INFO x` mostra `L1`, `L2` ou `L3` por cerca de um segundo e depois exibe o nível. Uma leitura de 100% fica registrada como 100 e aparece como `99` nos displays.
+O enunciado prevê um dígito para indicar a faixa de nível. O grupo usou dois displays para exibir a identificação do reservatório e o percentual. A instrução `INFO x, modo` mostra `L1`, `L2` ou `L3` por cerca de um segundo antes do nível quando `modo` é `1`; quando `modo` é `0`, atualiza diretamente o nível. Uma leitura de 100% fica registrada como 100 e aparece como `99` nos displays.
 
 ### Pinagem
 
@@ -116,7 +116,7 @@ A palavra lógica tem 4 bits de opcode e dois operandos de 7 bits cada. Os espa�
 | `OFF x` | Desliga a saída da bomba. | `OFF 1` | `0010 0000001 0000000` |
 | `ALARM x` | Ativa o alarme corretivo da bomba. | `ALARM 2` | `0011 0000010 0000000` |
 | `LED x` | Habilita a indicação RGB. | `LED 3` | `0100 0000011 0000000` |
-| `INFO x` | Faz nova leitura e mostra a identificação e o nível no display. | `INFO 1` | `0101 0000001 0000000` |
+| `INFO x, modo` | Faz nova leitura; com `modo = 1`, mostra a identificação e depois o nível; com `modo = 0`, atualiza diretamente o nível. | `INFO 1, 1` | `0101 0000001 0000001` |
 | `SILENCE x` | Desativa o alarme corretivo da bomba. | `SILENCE 2` | `0110 0000010 0000000` |
 | `LEDOFF x` | Desabilita e apaga a indicação RGB. | `LEDOFF 3` | `0111 0000011 0000000` |
 | `CMP x, n` | Subtrai o limite da última leitura válida e atualiza `ACC` e as flags. | `CMP 1, 30` | `1000 0000001 0011110` |

@@ -340,9 +340,9 @@ RUN
 
 ```text
 LOAD
-INFO 1
-INFO 2
-INFO 3
+INFO 1, 1
+INFO 2, 1
+INFO 3, 1
 WAIT 10
 JMP 0x00
 END
@@ -351,7 +351,7 @@ RUN
 ```
 
 * **Verificação dos dois dígitos (Display e Serial):**
-A instrução `INFO x` primeiro mostra a identificação do reservatório por 1 segundo e depois mostra o percentual inteiro:
+A instrução `INFO x, modo` mostra a identificação do reservatório por 1 segundo quando `modo = 1` e depois mostra o percentual inteiro. Com `modo = 0`, o percentual é atualizado diretamente:
 * Identificação: `L` no display de dezenas e o número do reservatório no display de unidades (`L1`, `L2` ou `L3`). O nível é lido no início da instrução, antes da exibição da identificação.
 * O percentual é mantido nos dois displays de ânodo comum após a identificação:
 * Dezenas: segmentos `a..g` nos pinos `22, 23, 24, 25, 26, 27, 28` (`DISP1`).
