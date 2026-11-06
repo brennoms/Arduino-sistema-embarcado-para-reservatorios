@@ -38,7 +38,7 @@ A conversão acrescenta 511 antes da divisão inteira para arredondar o resultad
 
 ### Displays de sete segmentos
 
-O enunciado prevê um dígito para indicar a faixa de nível. O grupo usou dois displays para exibir a identificação do reservatório e o percentual. A instrução `INFO x, modo` mostra `L1`, `L2` ou `L3` por cerca de um segundo antes do nível quando `modo` é `1`; quando `modo` é `0`, atualiza diretamente o nível. Uma leitura de 100% fica registrada como 100 e aparece como `99` nos displays.
+O enunciado prevê um dígito para indicar a faixa de nível. O grupo usou dois displays para exibir a identificação do reservatório e o percentual. A instrução `INFO x, modo` mostra `r1`, `r2` ou `r3` por cerca de um segundo antes do nível quando `modo` é `1`; quando `modo` é `0`, atualiza diretamente o nível. Uma leitura de 100% fica registrada como 100 e aparece como `99` nos displays.
 
 ### Pinagem
 

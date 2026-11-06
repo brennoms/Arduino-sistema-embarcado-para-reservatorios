@@ -221,7 +221,7 @@ O monitoramento visual analógico conta com **três LEDs RGB** independentes, um
 
 * **Atualização em Tempo Real:** Uma vez habilitado o indicador de um reservatório (`LED_HABILITADO[x - 1] = true`), qualquer leitura analógica realizada (`READ x` ou `INFO x, modo`) recalcula e atualiza instantaneamente a cor do LED RGB correspondente.
 * **Pinagem do hardware:** potenciômetros em `A0`, `A1` e `A2`; bombas em `46`, `47` e `48`; canais RGB vermelho/verde em `{38,40,42}` e `{39,41,43}`; buzzer em `52`.
-* **Displays:** o display de dezenas usa os segmentos `a..g` nos pinos `{22,23,24,25,26,27,28}` e o display de unidades nos pinos `{29,30,31,32,33,34,35}`. Os displays são de ânodo comum e, por isso, os segmentos são acionados em nível baixo. A instrução `INFO x, modo` mostra `Lx` por 1 segundo antes do percentual quando `modo = 1`; com `modo = 0`, atualiza diretamente o percentual inteiro de `00` a `99`. Leituras de `100%` são limitadas a `99` no display.
+* **Displays:** o display de dezenas usa os segmentos `a..g` nos pinos `{22,23,24,25,26,27,28}` e o display de unidades nos pinos `{29,30,31,32,33,34,35}`. Os displays são de ânodo comum e, por isso, os segmentos são acionados em nível baixo. A instrução `INFO x, modo` mostra `rx` por 1 segundo antes do percentual quando `modo = 1`; com `modo = 0`, atualiza diretamente o percentual inteiro de `00` a `99`. Leituras de `100%` são limitadas a `99` no display.
 
 ---
 
@@ -236,7 +236,7 @@ A ISA possui formato fixo de 18 bits (`OPCODE [4] | OP1 [7] | OP2 [7]`):
 | `OFF x` | `0010` | Bomba (1..3) | `0000000` | Desliga a bomba `x`. |
 | `ALARM x` | `0011` | Bomba (1..3) | `0000000` | Ativa alarme corretivo da bomba `x` e aciona buzzer. |
 | `LED x` | `0100` | Reservatório (1..3) | `0000000` | Habilita o monitoramento contínuo por LED RGB do reservatório `x`, acendendo na cor do nível atual. |
-| `INFO x, modo` | `0101` | Reservatório (1..3) | `0` ou `1` | Lê nível analógico, atualiza LED RGB e salva em `ACC`. Com `modo = 1`, exibe `Lx` por 1 segundo antes do percentual; com `modo = 0`, exibe diretamente o percentual de `00` a `99`. |
+| `INFO x, modo` | `0101` | Reservatório (1..3) | `0` ou `1` | Lê nível analógico, atualiza LED RGB e salva em `ACC`. Com `modo = 1`, exibe `rx` por 1 segundo antes do percentual; com `modo = 0`, exibe diretamente o percentual de `00` a `99`. |
 | `SILENCE x` | `0110` | Bomba (1..3) | `0000000` | Desativa alarme corretivo da bomba `x`. |
 | `LEDOFF x` | `0111` | Reservatório (1..3) | `0000000` | Desabilita o monitoramento visual do reservatório `x` e apaga seu LED RGB. |
 | `CMP x,n` | `1000` | Reservatório (1..3) | Limite (0..100) | Calcula `NIVEL[x] - n` via ULA e atualiza `ACC` e flags `L`, `Z`, `G`. |

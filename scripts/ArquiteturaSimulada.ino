@@ -551,7 +551,7 @@ const bool SEGMENTOS[10][7] = {
     {1,1,1,1,0,1,1}  // 9
 };
 
-const bool SEGMENTOS_LETRA_L[7] = {0, 0, 0, 1, 1, 1, 0};
+const bool SEGMENTOS_LETRA_R[7] = {0, 0, 0, 0, 1, 0, 1};
 
 void escreverSegmentosDisplay(const uint8_t pinos[7], const bool segmentos[7]) {
     for (uint8_t i = 0; i < 7; ++i) {
@@ -587,7 +587,7 @@ void mostrarPercentual(uint8_t percentual) {
 }
 
 void mostrarIdentificacaoReservatorio(uint8_t reservatorio) {
-    escreverSegmentosDisplay(PIN_DISPLAY_DEZENAS, SEGMENTOS_LETRA_L);
+    escreverSegmentosDisplay(PIN_DISPLAY_DEZENAS, SEGMENTOS_LETRA_R);
     escreverDigitoDisplay(PIN_DISPLAY_UNIDADES, reservatorio);
 }
 
