@@ -261,7 +261,7 @@ registrador válida antes de desviar.
 
 | Comando | Descrição |
 | --- | --- |
-| `LOAD` | Reseta o sistema, limpa memória, apaga display e LEDs RGB, zera estatísticas SECDED e abre modo de carga. |
+| `LOAD` | Reseta o sistema, limpa memória volátil e persistida, apaga display e LEDs RGB, zera estatísticas SECDED e abre modo de carga. |
 | `END` | Valida as instruções, verifica integridade SECDED da carga, destinos de saltos e fecha a montagem. |
 | `RUN` | Prepara o sistema para o modo de execução passo a passo a partir de `0x00`. |
 | `STEP` ou `*` | Executa um único ciclo de instrução (Busca → Decodifica → Executa) e emite telemetria. |
@@ -270,6 +270,14 @@ registrador válida antes de desviar.
 | `STATUS` | Exibe o painel geral da CPU, registradores, atuadores, estado dos 3 LEDs RGB (`VERMELHO`, `AMARELO`, `VERDE` ou `OFF`) e estatísticas SECDED. |
 | `MEM [ini fim]` | Despeja a memória exibindo o endereço, a palavra física SECDED (24 bits), a palavra lógica ISA (18 bits) e o diagnóstico ECC. |
 | `FLIP <end> <bit>` | **Injetor de falhas:** inverte o bit físico especificado (`0..23`) no endereço indicado para validar a correção SEC ou parada por DED. |
+
+O programa carregado é salvo na EEPROM a cada instrução. Assim, abrir o monitor
+serial (o que pode reiniciar a placa por causa do controle DTR) não apaga a
+memória de programa. Após o reset, o programa é restaurado em modo `PARADO`;
+envie `RUN` ou `AUTO` pelo monitor para iniciar a execução. O script
+`scripts/enviarViaSerial.py` envia até `END` e libera a porta por padrão,
+permitindo que o monitor serial do Arduino IDE seja aberto em seguida. Use
+`--monitorar` somente quando quiser manter o acompanhamento pelo próprio script.
 
 ---
 

@@ -1,6 +1,7 @@
 //Autor: Brenno Marques Silva @brennoms
 
 #include <Arduino.h>
+#include <EEPROM.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
@@ -46,6 +47,8 @@
 #define MASCARA_FISICA     0xFFFFFFUL
 
 #define LINE_BUFFER_SIZE   96
+#define EEPROM_MAGIC       0xA55A
+#define EEPROM_HEADER_SIZE 4
 
 // Limiares de nível para os LEDs RGB
 #define LIMIAR_CRITICO     20
@@ -193,6 +196,61 @@ bool MEM_OCUPADA[TAM_MEMORIA] = {false};
 
 uint16_t instrucao_atual = 0;
 bool programaFinalizado = false;
+
+uint16_t enderecoEEPROMInstrucao(uint8_t endereco) {
+    return EEPROM_HEADER_SIZE + ((uint16_t)endereco * sizeof(uint32_t));
+}
+
+void gravarUInt32EEPROM(uint16_t endereco, uint32_t valor) {
+    for (uint8_t i = 0; i < sizeof(uint32_t); ++i) {
+        EEPROM.update(endereco + i, (uint8_t)(valor >> (i * 8)));
+    }
+}
+
+uint32_t lerUInt32EEPROM(uint16_t endereco) {
+    uint32_t valor = 0;
+    for (uint8_t i = 0; i < sizeof(uint32_t); ++i) {
+        valor |= (uint32_t)EEPROM.read(endereco + i) << (i * 8);
+    }
+    return valor;
+}
+
+void limparProgramaPersistido() {
+    EEPROM.update(0, 0);
+    EEPROM.update(1, 0);
+    EEPROM.update(2, 0);
+    EEPROM.update(3, 0);
+}
+
+void persistirPrograma() {
+    EEPROM.update(0, 0);
+    EEPROM.update(1, 0);
+    EEPROM.update(2, instrucao_atual & 0xFF);
+    EEPROM.update(3, instrucao_atual >> 8);
+    for (uint16_t endereco = 0; endereco < instrucao_atual; ++endereco) {
+        gravarUInt32EEPROM(enderecoEEPROMInstrucao((uint8_t)endereco), MEM_PROG[endereco]);
+    }
+    EEPROM.update(0, (uint8_t)(EEPROM_MAGIC & 0xFF));
+    EEPROM.update(1, (uint8_t)(EEPROM_MAGIC >> 8));
+}
+
+bool restaurarProgramaPersistido() {
+    uint16_t magic = (uint16_t)EEPROM.read(0) | ((uint16_t)EEPROM.read(1) << 8);
+    uint16_t quantidade = (uint16_t)EEPROM.read(2) | ((uint16_t)EEPROM.read(3) << 8);
+
+    if (magic != EEPROM_MAGIC || quantidade == 0 || quantidade > TAM_MEMORIA) {
+        return false;
+    }
+
+    limparMemoria();
+    for (uint16_t endereco = 0; endereco < quantidade; ++endereco) {
+        MEM_PROG[endereco] = lerUInt32EEPROM(enderecoEEPROMInstrucao((uint8_t)endereco)) & MASCARA_FISICA;
+        MEM_OCUPADA[endereco] = true;
+    }
+    instrucao_atual = quantidade;
+    programaFinalizado = true;
+    return true;
+}
 
 // ============================== Controle ====================================
 ModoExecucao MODO = MODO_CARGA;
@@ -1011,7 +1069,6 @@ bool ASSEMBLER(char *instrucao) {
         Serial.println(F("ERRO: falha ao gravar memoria."));
         return false;
     }
-
     Serial.print(F("Montado em "));
     imprimirEndereco((uint8_t)instrucao_atual);
     Serial.print(F(" | "));
@@ -1031,6 +1088,7 @@ bool ASSEMBLER(char *instrucao) {
     Serial.println();
 
     instrucao_atual++;
+    persistirPrograma();
     return true;
 }
 
@@ -1077,6 +1135,7 @@ void resetarSistemaParaCarga() {
     desligarBombasEAlarmes();
     apagarDisplay();
     limparMemoria();
+    limparProgramaPersistido();
     resetarRegistradoresExecucao();
 
     CONTADOR_SEC = 0;
@@ -1995,15 +2054,21 @@ void setup() {
 
     desligarBombasEAlarmes();
     apagarDisplay();
-    limparMemoria();
     resetarRegistradoresExecucao();
 
-    MODO = MODO_CARGA;
-    programaFinalizado = false;
+    bool programaRestaurado = restaurarProgramaPersistido();
+    MODO = programaRestaurado ? MODO_PARADO : MODO_CARGA;
+    programaFinalizado = programaRestaurado;
 
     Serial.println(F("=========================================================="));
     Serial.println(F("CPU SIMULADA - 18 bits ISA / 24 bits SECDED / 128 palavras"));
-    Serial.println(F("Digite LOAD para iniciar uma nova carga."));
+    if (programaRestaurado) {
+        Serial.print(F("Programa restaurado da EEPROM: "));
+        Serial.print(instrucao_atual);
+        Serial.println(F(" instrucoes. Use RUN/AUTO para executar ou LOAD para substituir."));
+    } else {
+        Serial.println(F("Digite LOAD para iniciar uma nova carga."));
+    }
     Serial.println(F("Use FLIP 0x00 <0..23> para simular falhas de bit na RAM."));
     Serial.println(F("=========================================================="));
 }

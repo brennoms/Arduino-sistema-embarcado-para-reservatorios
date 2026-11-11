@@ -40,6 +40,11 @@ def parse_arguments() -> argparse.Namespace:
         default=0.05,
         help="intervalo em segundos entre linhas (padrao: 0.05)",
     )
+    parser.add_argument(
+        "--monitorar",
+        action="store_true",
+        help="mantem a porta aberta para acompanhar as respostas pelo script",
+    )
     return parser.parse_args()
 
 
@@ -51,7 +56,7 @@ def carregar_linhas(caminho: Path) -> list[str]:
         if instrucao:
             linhas.append(instrucao)
 
-    linhas.extend(("END", "RUN", "AUTO"))
+    linhas.append("END")
 
     return linhas
 
@@ -95,6 +100,7 @@ def enviar_programa(
     linhas: list[str],
     intervalo: float,
     caminho_log: Path,
+    monitorar: bool,
 ) -> None:
     if intervalo < 0:
         raise ValueError("o intervalo nao pode ser negativo")
@@ -114,6 +120,13 @@ def enviar_programa(
                 time.sleep(intervalo)
             registrar_resposta(conexao, arquivo_log)
 
+        if not monitorar:
+            print(
+                "Envio concluido. A porta sera liberada; abra o monitor serial "
+                "do Arduino IDE e envie RUN ou AUTO."
+            )
+            return
+
         print(f"Monitorando respostas; gravando em {caminho_log}. Pressione Ctrl+C para sair.")
         try:
             while True:
@@ -132,7 +145,13 @@ def main() -> int:
     try:
         porta = argumentos.porta or escolher_porta()
         linhas = carregar_linhas(ARQUIVO_ROTINA)
-        enviar_programa(porta, linhas, argumentos.intervalo, ARQUIVO_LOG)
+        enviar_programa(
+            porta,
+            linhas,
+            argumentos.intervalo,
+            ARQUIVO_LOG,
+            argumentos.monitorar,
+        )
     except (OSError, RuntimeError, ValueError, serial.SerialException) as erro:
         print(f"Erro ao enviar a rotina: {erro}", file=sys.stderr)
         return 1
