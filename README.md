@@ -177,13 +177,13 @@ IBMEC**, sob orientação do professor
 
 ## Integrantes
 
-| Integrante | O que fez |
-| --- | --- |
-| [Brenno Marques Silva](https://github.com/brennoms) | organizou o projeto — criou, documentou e testou os algoritmos e a ISA — soldou os componentes — projetou e colou a case — fez os furos para os componentes no acrílico — documentou o projeto  |
-| [Manuela Barros Menezes da Silva](https://github.com/manuubms) | diagramou as ligações — separou os componentes — auxiliou a soldar os componentes — ajudou a projetar, tirou as medidas, criou as etiquetas e envelopou a case — ajudou a fazer os furos no acrílico |
-| [Enzo Araujo Zambrotti](https://github.com/eaz-dev) | modelou o protótipo do projeto com [Wokwi](https://wokwi.com/) — fez alguns testes |
-| [João Gois de Otoni](https://github.com/JGois1) | fez o arquivo com os cortes necessários para montar a case |
-| [Santiago Alejo Babi Andreiu](https://github.com/santiago-andreiu-alt) | documentou o projeto |
+| Integrante | O que fez | Participação |
+| --- | --- | -- |
+| [Brenno Marques Silva](https://github.com/brennoms) | organizou o projeto — criou, documentou e testou os algoritmos e a ISA — soldou os componentes — projetou e colou a case — fez os furos para os componentes no acrílico — documentou o projeto  | TOTAL |
+| [Manuela Barros Menezes da Silva](https://github.com/manuubms) | diagramou as ligações — separou os componentes — auxiliou a soldar os componentes — ajudou a projetar, tirou as medidas, criou as etiquetas e envelopou a case — ajudou a fazer os furos no acrílico | TOTAL |
+| [Enzo Araujo Zambrotti](https://github.com/eaz-dev) | modelou o protótipo do projeto com [Wokwi](https://wokwi.com/) — fez alguns testes | PARCIAL |
+| [João Gois de Otoni](https://github.com/JGois1) | fez o arquivo com os cortes necessários para montar a case | PARCIAL |
+| [Santiago Alejo Babi Andreiu](https://github.com/santiago-andreiu-alt) | documentou o projeto | PARCIAL |
 
 
 
